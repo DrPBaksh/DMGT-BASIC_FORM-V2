@@ -1,0 +1,477 @@
+{
+  "title": "Company Data & AI Readiness Assessment",
+  "description": "Comprehensive evaluation of your organization's data and AI capabilities, infrastructure, and strategic readiness.",
+  "version": "1.0",
+  "sections": [
+    {
+      "id": "strategic_alignment",
+      "title": "Strategic Alignment & Vision",
+      "description": "Understanding your organization's strategic approach to data and AI",
+      "questions": [
+        {
+          "id": "company_industry",
+          "type": "select",
+          "title": "What is your company's primary industry?",
+          "description": "Select the industry that best describes your organization's main business focus.",
+          "required": true,
+          "options": [
+            "Technology & Software",
+            "Financial Services",
+            "Healthcare & Life Sciences",
+            "Manufacturing",
+            "Retail & E-commerce",
+            "Energy & Utilities",
+            "Transportation & Logistics",
+            "Government & Public Sector",
+            "Education",
+            "Professional Services",
+            "Media & Entertainment",
+            "Other"
+          ],
+          "validation": {
+            "required": true
+          }
+        },
+        {
+          "id": "company_size",
+          "type": "radio",
+          "title": "What is your organization's size?",
+          "description": "Number of employees in your organization",
+          "required": true,
+          "options": [
+            "1-50 employees (Small)",
+            "51-250 employees (Medium)",
+            "251-1,000 employees (Large)",
+            "1,001-5,000 employees (Enterprise)",
+            "5,000+ employees (Global Enterprise)"
+          ]
+        },
+        {
+          "id": "ai_strategy_exists",
+          "type": "radio",
+          "title": "Does your organization have a formal AI/Data strategy?",
+          "required": true,
+          "options": [
+            "Yes, comprehensive strategy with roadmap",
+            "Yes, basic strategy document",
+            "In development",
+            "Planned for next 12 months",
+            "No formal strategy"
+          ]
+        },
+        {
+          "id": "ai_strategy_document",
+          "type": "file",
+          "title": "Upload your AI/Data Strategy Document (if available)",
+          "description": "Please share your current AI or data strategy document to help us understand your strategic direction.",
+          "required": false,
+          "fileUpload": {
+            "allowedTypes": ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+            "maxSize": 10,
+            "multiple": false,
+            "description": "Accepted formats: PDF, DOC, DOCX (max 10MB)"
+          },
+          "conditional": {
+            "dependsOn": "ai_strategy_exists",
+            "condition": "not_equals",
+            "value": "No formal strategy"
+          }
+        },
+        {
+          "id": "ai_investment_budget",
+          "type": "select",
+          "title": "What percentage of your annual IT budget is allocated to AI/Data initiatives?",
+          "required": true,
+          "options": [
+            "Less than 5%",
+            "5-10%",
+            "11-20%",
+            "21-30%",
+            "More than 30%",
+            "No specific allocation"
+          ]
+        },
+        {
+          "id": "business_objectives",
+          "type": "checkbox",
+          "title": "What are your primary business objectives for AI/Data initiatives? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Improve operational efficiency",
+            "Enhance customer experience",
+            "Drive innovation and new products",
+            "Reduce costs",
+            "Increase revenue",
+            "Improve decision-making",
+            "Automate repetitive tasks",
+            "Gain competitive advantage",
+            "Improve risk management",
+            "Enhance compliance and governance"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data_infrastructure",
+      "title": "Data Infrastructure & Architecture",
+      "description": "Evaluation of your current data management and infrastructure capabilities",
+      "questions": [
+        {
+          "id": "data_architecture_maturity",
+          "type": "radio",
+          "title": "How would you rate your current data architecture maturity?",
+          "required": true,
+          "options": [
+            "Advanced - Modern, cloud-native, fully integrated",
+            "Intermediate - Some modern components, partially integrated",
+            "Basic - Traditional systems, limited integration",
+            "Legacy - Outdated systems, significant technical debt",
+            "Minimal - Little to no formal data architecture"
+          ]
+        },
+        {
+          "id": "cloud_adoption",
+          "type": "checkbox",
+          "title": "Which cloud platforms does your organization currently use? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Amazon Web Services (AWS)",
+            "Microsoft Azure",
+            "Google Cloud Platform (GCP)",
+            "IBM Cloud",
+            "Oracle Cloud",
+            "Private cloud",
+            "Hybrid cloud setup",
+            "On-premises only",
+            "Not sure"
+          ]
+        },
+        {
+          "id": "data_volume",
+          "type": "select",
+          "title": "Approximately how much data does your organization process monthly?",
+          "required": true,
+          "options": [
+            "Less than 1 TB",
+            "1-10 TB",
+            "10-100 TB",
+            "100 TB - 1 PB",
+            "More than 1 PB",
+            "Not sure"
+          ]
+        },
+        {
+          "id": "data_sources",
+          "type": "checkbox",
+          "title": "What types of data sources does your organization work with? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Structured databases (SQL)",
+            "Unstructured data (documents, text)",
+            "Real-time streaming data",
+            "IoT sensor data",
+            "Social media data",
+            "Web analytics data",
+            "Customer transaction data",
+            "Financial data",
+            "Operational data",
+            "External market data",
+            "Geospatial data",
+            "Video/Image data"
+          ]
+        },
+        {
+          "id": "data_quality_processes",
+          "type": "radio",
+          "title": "How mature are your data quality and governance processes?",
+          "required": true,
+          "options": [
+            "Highly mature - Automated quality checks, comprehensive governance",
+            "Moderate - Some processes in place, manual oversight",
+            "Basic - Ad-hoc quality checks, minimal governance",
+            "Limited - Inconsistent processes, reactive approach",
+            "None - No formal data quality or governance processes"
+          ]
+        },
+        {
+          "id": "data_integration_tools",
+          "type": "text",
+          "title": "What data integration and ETL tools does your organization currently use?",
+          "description": "Please list the primary tools and platforms you use for data integration, transformation, and loading.",
+          "required": false,
+          "validation": {
+            "maxLength": 500
+          }
+        }
+      ]
+    },
+    {
+      "id": "ai_capabilities",
+      "title": "AI & Analytics Capabilities",
+      "description": "Assessment of your organization's current AI and analytics capabilities",
+      "questions": [
+        {
+          "id": "ai_use_cases",
+          "type": "checkbox",
+          "title": "Which AI/ML use cases has your organization implemented or is actively pursuing? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Predictive analytics",
+            "Customer segmentation and personalization",
+            "Fraud detection and prevention",
+            "Process automation (RPA)",
+            "Natural Language Processing (NLP)",
+            "Computer vision and image recognition",
+            "Recommendation systems",
+            "Chatbots and virtual assistants",
+            "Supply chain optimization",
+            "Predictive maintenance",
+            "Risk assessment and management",
+            "Sentiment analysis",
+            "Demand forecasting",
+            "None currently implemented"
+          ]
+        },
+        {
+          "id": "ml_platforms",
+          "type": "checkbox",
+          "title": "Which machine learning platforms and tools does your organization use? (Select all that apply)",
+          "required": false,
+          "options": [
+            "TensorFlow",
+            "PyTorch",
+            "Scikit-learn",
+            "AWS SageMaker",
+            "Azure Machine Learning",
+            "Google Cloud AI Platform",
+            "IBM Watson",
+            "Databricks",
+            "H2O.ai",
+            "DataRobot",
+            "Custom in-house solutions",
+            "None currently"
+          ]
+        },
+        {
+          "id": "analytics_maturity",
+          "type": "radio",
+          "title": "How would you characterize your organization's analytics maturity?",
+          "required": true,
+          "options": [
+            "Advanced - Predictive and prescriptive analytics, real-time insights",
+            "Intermediate - Some predictive analytics, regular reporting",
+            "Basic - Descriptive analytics, standard dashboards",
+            "Developing - Ad-hoc reporting, limited analytics",
+            "Minimal - Little to no formal analytics capabilities"
+          ]
+        },
+        {
+          "id": "model_deployment",
+          "type": "radio",
+          "title": "How does your organization typically deploy and manage ML models in production?",
+          "required": true,
+          "options": [
+            "Automated MLOps pipeline with CI/CD",
+            "Semi-automated deployment with some manual steps",
+            "Manual deployment process",
+            "Models primarily used for analysis, not deployed",
+            "No models currently in production"
+          ]
+        },
+        {
+          "id": "real_time_analytics",
+          "type": "radio",
+          "title": "Does your organization have real-time analytics capabilities?",
+          "required": true,
+          "options": [
+            "Yes, comprehensive real-time analytics across multiple use cases",
+            "Yes, limited real-time analytics for specific use cases",
+            "In development",
+            "Planned but not started",
+            "No real-time analytics capabilities"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "governance_compliance",
+      "title": "Governance, Security & Compliance",
+      "description": "Understanding your data governance, security measures, and compliance requirements",
+      "questions": [
+        {
+          "id": "data_governance_framework",
+          "type": "radio",
+          "title": "Does your organization have a formal data governance framework?",
+          "required": true,
+          "options": [
+            "Yes, comprehensive framework with clear policies and procedures",
+            "Yes, basic framework with some policies",
+            "In development",
+            "Planned for implementation",
+            "No formal data governance framework"
+          ]
+        },
+        {
+          "id": "compliance_requirements",
+          "type": "checkbox",
+          "title": "Which compliance requirements does your organization need to meet? (Select all that apply)",
+          "required": true,
+          "options": [
+            "GDPR (General Data Protection Regulation)",
+            "CCPA (California Consumer Privacy Act)",
+            "HIPAA (Health Insurance Portability and Accountability Act)",
+            "SOX (Sarbanes-Oxley Act)",
+            "PCI DSS (Payment Card Industry Data Security Standard)",
+            "ISO 27001",
+            "SOC 2",
+            "Industry-specific regulations",
+            "No specific compliance requirements",
+            "Not sure"
+          ]
+        },
+        {
+          "id": "data_security_measures",
+          "type": "checkbox",
+          "title": "What data security measures does your organization have in place? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Data encryption at rest",
+            "Data encryption in transit",
+            "Access controls and user authentication",
+            "Role-based access control (RBAC)",
+            "Data masking and anonymization",
+            "Regular security audits",
+            "Data loss prevention (DLP)",
+            "Network security monitoring",
+            "Backup and disaster recovery",
+            "Security incident response plan"
+          ]
+        },
+        {
+          "id": "data_privacy_processes",
+          "type": "radio",
+          "title": "How mature are your data privacy and protection processes?",
+          "required": true,
+          "options": [
+            "Highly mature - Comprehensive privacy by design, automated compliance",
+            "Moderate - Good practices in place, regular compliance reviews",
+            "Basic - Some privacy measures, manual compliance processes",
+            "Limited - Minimal privacy controls, reactive approach",
+            "None - No formal data privacy processes"
+          ]
+        },
+        {
+          "id": "ai_ethics_guidelines",
+          "type": "radio",
+          "title": "Does your organization have AI ethics guidelines or responsible AI practices?",
+          "required": true,
+          "options": [
+            "Yes, comprehensive AI ethics framework with regular reviews",
+            "Yes, basic guidelines documented",
+            "In development",
+            "Considering implementation",
+            "No AI ethics guidelines"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "organizational_readiness",
+      "title": "Organizational Readiness & Culture",
+      "description": "Evaluation of your organization's readiness for AI transformation",
+      "questions": [
+        {
+          "id": "leadership_support",
+          "type": "radio",
+          "title": "How would you rate leadership support for AI/Data initiatives?",
+          "required": true,
+          "options": [
+            "Excellent - Strong executive sponsorship and investment",
+            "Good - General support with adequate resources",
+            "Moderate - Some support but limited resources",
+            "Limited - Minimal leadership engagement",
+            "Poor - Little to no leadership support"
+          ]
+        },
+        {
+          "id": "data_culture",
+          "type": "radio",
+          "title": "How would you describe your organization's data culture?",
+          "required": true,
+          "options": [
+            "Data-driven - Decisions consistently based on data insights",
+            "Data-informed - Data regularly used in decision-making",
+            "Developing - Growing awareness of data importance",
+            "Traditional - Decisions primarily based on experience/intuition",
+            "Resistant - Limited interest in data-driven approaches"
+          ]
+        },
+        {
+          "id": "change_management_capability",
+          "type": "radio",
+          "title": "How would you rate your organization's change management capability?",
+          "required": true,
+          "options": [
+            "Excellent - Proven track record of successful transformations",
+            "Good - Generally successful with change initiatives",
+            "Moderate - Mixed success with change management",
+            "Limited - Struggles with organizational change",
+            "Poor - Significant resistance to change"
+          ]
+        },
+        {
+          "id": "cross_functional_collaboration",
+          "type": "radio",
+          "title": "How effectively do different departments collaborate on data/AI projects?",
+          "required": true,
+          "options": [
+            "Very effective - Seamless cross-functional collaboration",
+            "Effective - Good collaboration with clear processes",
+            "Moderate - Some collaboration, room for improvement",
+            "Limited - Siloed departments, minimal collaboration",
+            "Poor - Significant barriers to collaboration"
+          ]
+        },
+        {
+          "id": "innovation_appetite",
+          "type": "radio",
+          "title": "How would you describe your organization's appetite for innovation and experimentation?",
+          "required": true,
+          "options": [
+            "High - Actively encourages innovation and risk-taking",
+            "Moderate - Supports innovation within controlled parameters",
+            "Conservative - Prefers proven solutions over innovation",
+            "Risk-averse - Minimal tolerance for experimentation",
+            "Very conservative - Strong preference for traditional approaches"
+          ]
+        },
+        {
+          "id": "success_barriers",
+          "type": "checkbox",
+          "title": "What do you see as the biggest barriers to AI/Data success in your organization? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Lack of skilled talent",
+            "Insufficient budget/resources",
+            "Poor data quality",
+            "Legacy technology constraints",
+            "Organizational resistance to change",
+            "Lack of clear strategy",
+            "Regulatory/compliance concerns",
+            "Unclear ROI/business value",
+            "Lack of leadership support",
+            "Siloed departments",
+            "Security concerns",
+            "Vendor/technology selection challenges"
+          ]
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "estimatedCompletionTime": "25-35 minutes",
+    "lastUpdated": "2025-06-16",
+    "version": "1.0",
+    "author": "DMGT Assessment Team"
+  }
+}
