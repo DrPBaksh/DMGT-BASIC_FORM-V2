@@ -1,0 +1,604 @@
+{
+  "title": "Employee Data & AI Readiness Assessment",
+  "description": "Individual assessment to evaluate your personal skills, experience, and readiness for data and AI initiatives.",
+  "version": "1.0",
+  "sections": [
+    {
+      "id": "personal_background",
+      "title": "Personal Background & Role",
+      "description": "Understanding your role and background within the organization",
+      "questions": [
+        {
+          "id": "job_title",
+          "type": "text",
+          "title": "What is your current job title?",
+          "required": true,
+          "validation": {
+            "minLength": 2,
+            "maxLength": 100
+          }
+        },
+        {
+          "id": "department",
+          "type": "select",
+          "title": "Which department do you work in?",
+          "required": true,
+          "options": [
+            "Information Technology",
+            "Data Science/Analytics",
+            "Marketing",
+            "Sales",
+            "Finance",
+            "Operations",
+            "Human Resources",
+            "Product Management",
+            "Research & Development",
+            "Customer Service",
+            "Business Intelligence",
+            "Strategy & Planning",
+            "Quality Assurance",
+            "Supply Chain",
+            "Legal/Compliance",
+            "Other"
+          ]
+        },
+        {
+          "id": "experience_years",
+          "type": "select",
+          "title": "How many years of professional experience do you have?",
+          "required": true,
+          "options": [
+            "Less than 1 year",
+            "1-3 years",
+            "4-7 years",
+            "8-12 years",
+            "13-20 years",
+            "More than 20 years"
+          ]
+        },
+        {
+          "id": "company_tenure",
+          "type": "select",
+          "title": "How long have you been with this organization?",
+          "required": true,
+          "options": [
+            "Less than 6 months",
+            "6-12 months",
+            "1-2 years",
+            "3-5 years",
+            "6-10 years",
+            "More than 10 years"
+          ]
+        },
+        {
+          "id": "team_size",
+          "type": "select",
+          "title": "How many people are in your immediate team?",
+          "required": true,
+          "options": [
+            "Just me (individual contributor)",
+            "2-5 people",
+            "6-10 people",
+            "11-20 people",
+            "21-50 people",
+            "More than 50 people"
+          ]
+        },
+        {
+          "id": "management_role",
+          "type": "radio",
+          "title": "Do you have management or leadership responsibilities?",
+          "required": true,
+          "options": [
+            "Yes, I manage a team directly",
+            "Yes, I have project/initiative leadership responsibilities",
+            "Informal leadership role",
+            "No management responsibilities"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "technical_skills",
+      "title": "Technical Skills & Experience",
+      "description": "Assessment of your technical capabilities related to data and AI",
+      "questions": [
+        {
+          "id": "programming_languages",
+          "type": "checkbox",
+          "title": "Which programming languages are you proficient in? (Select all that apply)",
+          "required": false,
+          "options": [
+            "Python",
+            "R",
+            "SQL",
+            "Java",
+            "Scala",
+            "JavaScript",
+            "C++",
+            "C#",
+            "Go",
+            "Julia",
+            "MATLAB",
+            "SAS",
+            "No programming experience"
+          ]
+        },
+        {
+          "id": "data_tools_experience",
+          "type": "checkbox",
+          "title": "Which data analysis and visualization tools have you used? (Select all that apply)",
+          "required": false,
+          "options": [
+            "Excel (advanced functions, pivot tables)",
+            "Tableau",
+            "Power BI",
+            "Qlik Sense/QlikView",
+            "Looker",
+            "Jupyter Notebooks",
+            "Apache Spark",
+            "Hadoop",
+            "Google Analytics",
+            "Salesforce Analytics",
+            "SPSS",
+            "SAS",
+            "None of the above"
+          ]
+        },
+        {
+          "id": "database_experience",
+          "type": "checkbox",
+          "title": "Which database technologies have you worked with? (Select all that apply)",
+          "required": false,
+          "options": [
+            "MySQL",
+            "PostgreSQL",
+            "Microsoft SQL Server",
+            "Oracle Database",
+            "MongoDB",
+            "Cassandra",
+            "Redis",
+            "Amazon RDS",
+            "Google BigQuery",
+            "Snowflake",
+            "Azure SQL Database",
+            "No database experience"
+          ]
+        },
+        {
+          "id": "ml_frameworks",
+          "type": "checkbox",
+          "title": "Which machine learning frameworks or platforms have you used? (Select all that apply)",
+          "required": false,
+          "options": [
+            "TensorFlow",
+            "PyTorch",
+            "Scikit-learn",
+            "Keras",
+            "XGBoost",
+            "AWS SageMaker",
+            "Azure Machine Learning",
+            "Google Cloud AI Platform",
+            "H2O.ai",
+            "DataRobot",
+            "Alteryx",
+            "No ML framework experience"
+          ]
+        },
+        {
+          "id": "cloud_platforms",
+          "type": "checkbox",
+          "title": "Which cloud platforms have you worked with? (Select all that apply)",
+          "required": false,
+          "options": [
+            "Amazon Web Services (AWS)",
+            "Microsoft Azure",
+            "Google Cloud Platform (GCP)",
+            "IBM Cloud",
+            "Oracle Cloud",
+            "Salesforce Cloud",
+            "No cloud platform experience"
+          ]
+        },
+        {
+          "id": "technical_skill_level",
+          "type": "radio",
+          "title": "How would you rate your overall technical skill level?",
+          "required": true,
+          "options": [
+            "Advanced - I can build complex solutions and mentor others",
+            "Intermediate - I can work independently on technical tasks",
+            "Basic - I can perform simple technical tasks with guidance",
+            "Beginner - Limited technical experience",
+            "Non-technical - I focus on business/strategic aspects"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "data_analytics_experience",
+      "title": "Data Analytics Experience",
+      "description": "Your experience with data analysis, interpretation, and decision-making",
+      "questions": [
+        {
+          "id": "data_analysis_frequency",
+          "type": "radio",
+          "title": "How frequently do you work with data in your current role?",
+          "required": true,
+          "options": [
+            "Daily - Data analysis is a core part of my job",
+            "Weekly - Regular data work as part of my responsibilities",
+            "Monthly - Occasional data analysis for projects",
+            "Quarterly - Infrequent data work",
+            "Rarely - Minimal data interaction in my role"
+          ]
+        },
+        {
+          "id": "data_types_worked_with",
+          "type": "checkbox",
+          "title": "What types of data do you typically work with? (Select all that apply)",
+          "required": false,
+          "options": [
+            "Customer data",
+            "Sales and revenue data",
+            "Marketing data",
+            "Financial data",
+            "Operational data",
+            "Web analytics data",
+            "Social media data",
+            "Survey data",
+            "Sensor/IoT data",
+            "Text/Document data",
+            "Image/Video data",
+            "I don't typically work with data"
+          ]
+        },
+        {
+          "id": "analytics_techniques",
+          "type": "checkbox",
+          "title": "Which analytics techniques have you used? (Select all that apply)",
+          "required": false,
+          "options": [
+            "Descriptive statistics",
+            "Data visualization",
+            "Trend analysis",
+            "Correlation analysis",
+            "Regression analysis",
+            "A/B testing",
+            "Cohort analysis",
+            "Predictive modeling",
+            "Machine learning",
+            "Statistical hypothesis testing",
+            "Time series analysis",
+            "None of the above"
+          ]
+        },
+        {
+          "id": "data_driven_decisions",
+          "type": "radio",
+          "title": "How often do you use data to make decisions in your role?",
+          "required": true,
+          "options": [
+            "Always - My decisions are primarily data-driven",
+            "Usually - I typically rely on data with some intuition",
+            "Sometimes - I use data when it's readily available",
+            "Rarely - I occasionally reference data",
+            "Never - My decisions are based on experience/intuition"
+          ]
+        },
+        {
+          "id": "data_interpretation_confidence",
+          "type": "radio",
+          "title": "How confident are you in interpreting data and analytics results?",
+          "required": true,
+          "options": [
+            "Very confident - I can interpret complex analyses",
+            "Confident - I understand most standard analyses",
+            "Somewhat confident - I can interpret basic analyses",
+            "Limited confidence - I need help with interpretation",
+            "Not confident - I struggle with data interpretation"
+          ]
+        },
+        {
+          "id": "data_quality_awareness",
+          "type": "radio",
+          "title": "How well do you understand data quality issues and their impact?",
+          "required": true,
+          "options": [
+            "Expert level - I can identify and address quality issues",
+            "Good understanding - I recognize most quality problems",
+            "Basic understanding - I know quality matters",
+            "Limited understanding - I'm learning about data quality",
+            "No understanding - Data quality is new to me"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ai_ml_experience",
+      "title": "AI & Machine Learning Experience",
+      "description": "Your exposure to and experience with AI and machine learning technologies",
+      "questions": [
+        {
+          "id": "ai_ml_familiarity",
+          "type": "radio",
+          "title": "How familiar are you with AI and machine learning concepts?",
+          "required": true,
+          "options": [
+            "Expert - I design and implement AI/ML solutions",
+            "Advanced - I understand and can apply AI/ML techniques",
+            "Intermediate - I understand basic concepts and some applications",
+            "Basic - I have general awareness of AI/ML",
+            "Minimal - Limited knowledge of AI/ML concepts"
+          ]
+        },
+        {
+          "id": "ai_projects_involved",
+          "type": "radio",
+          "title": "Have you been involved in any AI/ML projects?",
+          "required": true,
+          "options": [
+            "Yes, I've led multiple AI/ML projects",
+            "Yes, I've been a key contributor to AI/ML projects",
+            "Yes, I've participated in AI/ML projects",
+            "Yes, I've observed or provided input to AI/ML projects",
+            "No, I haven't been involved in AI/ML projects"
+          ]
+        },
+        {
+          "id": "ai_use_cases_familiar",
+          "type": "checkbox",
+          "title": "Which AI/ML use cases are you familiar with? (Select all that apply)",
+          "required": false,
+          "options": [
+            "Predictive analytics",
+            "Classification and categorization",
+            "Recommendation systems",
+            "Natural Language Processing (NLP)",
+            "Computer vision",
+            "Chatbots and virtual assistants",
+            "Fraud detection",
+            "Process automation",
+            "Sentiment analysis",
+            "Demand forecasting",
+            "Personalization",
+            "None of the above"
+          ]
+        },
+        {
+          "id": "ai_tools_used",
+          "type": "checkbox",
+          "title": "Which AI/ML tools or services have you used? (Select all that apply)",
+          "required": false,
+          "options": [
+            "AutoML platforms (Google AutoML, Azure ML, etc.)",
+            "Pre-built AI APIs (vision, speech, language)",
+            "Business intelligence AI features",
+            "AI-powered analytics tools",
+            "Conversational AI platforms",
+            "AI-enhanced productivity tools",
+            "Custom ML model development",
+            "None of the above"
+          ]
+        },
+        {
+          "id": "ai_model_lifecycle",
+          "type": "radio",
+          "title": "How familiar are you with the AI/ML model lifecycle (development to deployment)?",
+          "required": true,
+          "options": [
+            "Very familiar - I understand the complete lifecycle",
+            "Familiar - I know most phases of the lifecycle",
+            "Somewhat familiar - I understand some phases",
+            "Limited familiarity - Basic knowledge only",
+            "Not familiar - This is new to me"
+          ]
+        },
+        {
+          "id": "ai_ethics_awareness",
+          "type": "radio",
+          "title": "How aware are you of AI ethics and responsible AI principles?",
+          "required": true,
+          "options": [
+            "Very aware - I actively consider ethics in AI projects",
+            "Aware - I understand the importance of AI ethics",
+            "Somewhat aware - I know ethics matters in AI",
+            "Limited awareness - I've heard about AI ethics",
+            "Not aware - AI ethics is new to me"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "learning_development",
+      "title": "Learning & Development",
+      "description": "Your learning preferences and development needs for data and AI skills",
+      "questions": [
+        {
+          "id": "learning_goals",
+          "type": "checkbox",
+          "title": "What data/AI skills would you most like to develop? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Basic data analysis and interpretation",
+            "Advanced analytics techniques",
+            "Data visualization",
+            "SQL and database skills",
+            "Programming (Python, R, etc.)",
+            "Machine learning fundamentals",
+            "Advanced machine learning",
+            "Data science methodology",
+            "AI strategy and business applications",
+            "Data governance and quality",
+            "AI ethics and responsible AI",
+            "No specific learning goals"
+          ]
+        },
+        {
+          "id": "preferred_learning_methods",
+          "type": "checkbox",
+          "title": "What are your preferred learning methods? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Online courses (self-paced)",
+            "Live virtual training sessions",
+            "In-person workshops",
+            "Hands-on projects",
+            "Mentoring/coaching",
+            "Reading books and articles",
+            "Video tutorials",
+            "Peer learning groups",
+            "Conference attendance",
+            "University/formal education",
+            "On-the-job training"
+          ]
+        },
+        {
+          "id": "time_commitment",
+          "type": "radio",
+          "title": "How much time per week could you realistically dedicate to learning data/AI skills?",
+          "required": true,
+          "options": [
+            "More than 5 hours per week",
+            "3-5 hours per week",
+            "1-2 hours per week",
+            "Less than 1 hour per week",
+            "No time available for additional learning"
+          ]
+        },
+        {
+          "id": "learning_support_needed",
+          "type": "checkbox",
+          "title": "What support would help you learn more effectively? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Access to learning platforms/tools",
+            "Dedicated learning time during work hours",
+            "Financial support for courses/certifications",
+            "Mentoring from experienced colleagues",
+            "Practice datasets and projects",
+            "Clear learning path/curriculum",
+            "Manager support and encouragement",
+            "Peer learning groups",
+            "Recognition for learning achievements",
+            "No additional support needed"
+          ]
+        },
+        {
+          "id": "certification_interest",
+          "type": "radio",
+          "title": "Are you interested in pursuing data/AI certifications?",
+          "required": true,
+          "options": [
+            "Yes, very interested in multiple certifications",
+            "Yes, interested in specific certifications",
+            "Maybe, depending on relevance to my role",
+            "Not particularly interested",
+            "No interest in certifications"
+          ]
+        },
+        {
+          "id": "career_aspirations",
+          "type": "textarea",
+          "title": "How do you see data and AI skills fitting into your career aspirations?",
+          "description": "Please share your thoughts on how developing data and AI capabilities could impact your career goals.",
+          "required": false,
+          "validation": {
+            "maxLength": 500
+          }
+        }
+      ]
+    },
+    {
+      "id": "workplace_application",
+      "title": "Workplace Application & Impact",
+      "description": "How you currently use or could use data and AI in your work",
+      "questions": [
+        {
+          "id": "current_data_challenges",
+          "type": "checkbox",
+          "title": "What data-related challenges do you currently face in your work? (Select all that apply)",
+          "required": true,
+          "options": [
+            "Accessing the data I need",
+            "Poor data quality",
+            "Data is in multiple systems",
+            "Lack of real-time data",
+            "Too much data to process manually",
+            "Difficulty interpreting data",
+            "Lack of appropriate tools",
+            "No time for data analysis",
+            "Unclear data definitions",
+            "Data security/compliance concerns",
+            "No significant data challenges"
+          ]
+        },
+        {
+          "id": "ai_opportunities",
+          "type": "textarea",
+          "title": "Where do you see the biggest opportunities for AI to improve your work or department?",
+          "description": "Please describe specific areas where AI could automate tasks, provide insights, or enhance decision-making.",
+          "required": false,
+          "validation": {
+            "maxLength": 500
+          }
+        },
+        {
+          "id": "collaboration_experience",
+          "type": "radio",
+          "title": "How often do you collaborate with data scientists, analysts, or AI specialists?",
+          "required": true,
+          "options": [
+            "Daily - I work closely with data/AI teams",
+            "Weekly - Regular collaboration on projects",
+            "Monthly - Occasional project collaboration",
+            "Rarely - Minimal interaction with data/AI teams",
+            "Never - No collaboration with data/AI specialists"
+          ]
+        },
+        {
+          "id": "change_readiness",
+          "type": "radio",
+          "title": "How ready are you to adopt new AI-powered tools and processes in your work?",
+          "required": true,
+          "options": [
+            "Very ready - I actively seek new AI tools",
+            "Ready - I'm open to trying new AI solutions",
+            "Somewhat ready - I'll adopt with proper support",
+            "Cautious - I prefer proven solutions",
+            "Resistant - I prefer traditional methods"
+          ]
+        },
+        {
+          "id": "training_others",
+          "type": "radio",
+          "title": "Would you be interested in helping to train or mentor others in data/AI skills?",
+          "required": true,
+          "options": [
+            "Yes, very interested in being a trainer/mentor",
+            "Yes, interested in informal mentoring",
+            "Maybe, depending on the time commitment",
+            "Probably not interested",
+            "Not interested in training others"
+          ]
+        },
+        {
+          "id": "innovation_ideas",
+          "type": "textarea",
+          "title": "Do you have any innovative ideas for how data or AI could be used in your organization?",
+          "description": "Share any creative ideas you have for applying data analytics or AI to solve business problems or create new opportunities.",
+          "required": false,
+          "validation": {
+            "maxLength": 500
+          }
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "estimatedCompletionTime": "15-25 minutes",
+    "lastUpdated": "2025-06-16",
+    "version": "1.0",
+    "author": "DMGT Assessment Team"
+  }
+}
