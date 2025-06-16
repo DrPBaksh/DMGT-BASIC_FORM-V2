@@ -1,0 +1,855 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DMGT Data & AI Readiness Assessment Form - Enterprise AWS Infrastructure'
+
+Parameters:
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Environment name (dev or prod)
+  
+  BucketPrefix:
+    Type: String
+    Description: Prefix for S3 bucket names
+    Default: dmgt-assessment
+
+Resources:
+  # S3 Buckets
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketPrefix}-website-${AWS::AccountId}-${Environment}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+      VersioningConfiguration:
+        Status: Enabled
+      NotificationConfiguration:
+        CloudWatchConfigurations:
+          - Event: s3:ObjectCreated:*
+            CloudWatchConfiguration:
+              LogGroupName: !Ref WebsiteLogGroup
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub '${WebsiteBucket}/*'
+
+  ConfigBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketPrefix}-config-${AWS::AccountId}-${Environment}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 30
+
+  ResponsesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketPrefix}-responses-${AWS::AccountId}-${Environment}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ArchiveOldData
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 30
+              - StorageClass: GLACIER
+                TransitionInDays: 90
+
+  FilesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketPrefix}-files-${AWS::AccountId}-${Environment}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: ArchiveFiles
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 60
+              - StorageClass: GLACIER
+                TransitionInDays: 180
+
+  # CloudFront Distribution
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            Id: S3Origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+        Enabled: true
+        DefaultRootObject: index.html
+        Comment: !Sub 'DMGT Assessment Form - ${Environment}'
+        DefaultCacheBehavior:
+          AllowedMethods: [DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT]
+          TargetOriginId: S3Origin
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+            Headers:
+              - Origin
+              - Access-Control-Request-Headers
+              - Access-Control-Request-Method
+          ViewerProtocolPolicy: redirect-to-https
+          MinTTL: 0
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+          Compress: true
+        PriceClass: PriceClass_100
+        CustomErrorResponses:
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+        HttpVersion: http2
+
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub 'DMGT Assessment OAI - ${Environment}'
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'dmgt-assessment-lambda-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub '${ConfigBucket}/*'
+                  - !Sub '${ResponsesBucket}/*'
+                  - !Sub '${FilesBucket}/*'
+                  - !Ref ConfigBucket
+                  - !Ref ResponsesBucket
+                  - !Ref FilesBucket
+
+  # Lambda Functions
+  GetQuestionsFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dmgt-assessment-get-questions-${Environment}'
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          CONFIG_BUCKET: !Ref ConfigBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Get assessment type from path
+                  assessment_type = event['pathParameters']['type']
+                  if assessment_type not in ['Company', 'Employee']:
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Invalid assessment type'})
+                      }
+                  
+                  bucket = os.environ['CONFIG_BUCKET']
+                  key = f'config/{assessment_type}.json'
+                  
+                  # Get questions from S3
+                  response = s3.get_object(Bucket=bucket, Key=key)
+                  questions = json.loads(response['Body'].read())
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps(questions)
+                  }
+                  
+              except ClientError as e:
+                  if e.response['Error']['Code'] == 'NoSuchKey':
+                      return {
+                          'statusCode': 404,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Questions not found'})
+                      }
+                  raise
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
+
+  SaveResponseFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dmgt-assessment-save-response-${Environment}'
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          RESPONSES_BUCKET: !Ref ResponsesBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from datetime import datetime
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Parse request body
+                  body = json.loads(event['body'])
+                  assessment_type = body.get('assessmentType')
+                  company_id = body.get('companyId')
+                  employee_id = body.get('employeeId')
+                  responses = body.get('responses', {})
+                  
+                  if not assessment_type or not company_id:
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Missing required fields'})
+                      }
+                  
+                  bucket = os.environ['RESPONSES_BUCKET']
+                  
+                  # Determine S3 key based on assessment type
+                  if assessment_type == 'Company':
+                      key = f'company-responses/{company_id}.json'
+                  else:
+                      if not employee_id:
+                          return {
+                              'statusCode': 400,
+                              'headers': headers,
+                              'body': json.dumps({'error': 'Employee ID required for employee assessment'})
+                          }
+                      key = f'employee-responses/{company_id}/{employee_id}.json'
+                  
+                  # Prepare response data
+                  response_data = {
+                      'assessmentType': assessment_type,
+                      'companyId': company_id,
+                      'employeeId': employee_id,
+                      'responses': responses,
+                      'lastUpdated': datetime.utcnow().isoformat(),
+                      'version': '1.0'
+                  }
+                  
+                  # Save to S3
+                  s3.put_object(
+                      Bucket=bucket,
+                      Key=key,
+                      Body=json.dumps(response_data, indent=2),
+                      ContentType='application/json'
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps({'message': 'Response saved successfully', 'key': key})
+                  }
+                  
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
+
+  GetResponseFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dmgt-assessment-get-response-${Environment}'
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          RESPONSES_BUCKET: !Ref ResponsesBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Get parameters
+                  assessment_type = event['pathParameters']['type']
+                  company_id = event['pathParameters']['companyId']
+                  employee_id = event['pathParameters'].get('employeeId')
+                  
+                  bucket = os.environ['RESPONSES_BUCKET']
+                  
+                  # Determine S3 key
+                  if assessment_type == 'Company':
+                      key = f'company-responses/{company_id}.json'
+                  else:
+                      if not employee_id:
+                          return {
+                              'statusCode': 400,
+                              'headers': headers,
+                              'body': json.dumps({'error': 'Employee ID required'})
+                          }
+                      key = f'employee-responses/{company_id}/{employee_id}.json'
+                  
+                  # Get response from S3
+                  response = s3.get_object(Bucket=bucket, Key=key)
+                  response_data = json.loads(response['Body'].read())
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps(response_data)
+                  }
+                  
+              except ClientError as e:
+                  if e.response['Error']['Code'] == 'NoSuchKey':
+                      return {
+                          'statusCode': 404,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Response not found'})
+                      }
+                  raise
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
+
+  FileUploadFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'dmgt-assessment-file-upload-${Environment}'
+      Runtime: python3.9
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 30
+      Environment:
+        Variables:
+          FILES_BUCKET: !Ref FilesBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import base64
+          import uuid
+          from datetime import datetime
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                      'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Parse request
+                  body = json.loads(event['body'])
+                  company_id = body.get('companyId')
+                  question_id = body.get('questionId')
+                  file_name = body.get('fileName')
+                  file_content = body.get('fileContent')  # base64 encoded
+                  content_type = body.get('contentType', 'application/octet-stream')
+                  
+                  if not all([company_id, question_id, file_name, file_content]):
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Missing required fields'})
+                      }
+                  
+                  # Decode file content
+                  try:
+                      file_data = base64.b64decode(file_content)
+                  except Exception:
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Invalid file content encoding'})
+                      }
+                  
+                  bucket = os.environ['FILES_BUCKET']
+                  
+                  # Generate unique file key
+                  timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                  unique_id = str(uuid.uuid4())[:8]
+                  safe_filename = file_name.replace(' ', '_').replace('/', '_')
+                  key = f'company-files/{company_id}/{question_id}/{timestamp}_{unique_id}_{safe_filename}'
+                  
+                  # Upload to S3
+                  s3.put_object(
+                      Bucket=bucket,
+                      Key=key,
+                      Body=file_data,
+                      ContentType=content_type,
+                      Metadata={
+                          'original-filename': file_name,
+                          'upload-timestamp': datetime.utcnow().isoformat(),
+                          'company-id': company_id,
+                          'question-id': question_id
+                      }
+                  )
+                  
+                  # Generate presigned URL for access
+                  download_url = s3.generate_presigned_url(
+                      'get_object',
+                      Params={'Bucket': bucket, 'Key': key},
+                      ExpiresIn=3600  # 1 hour
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps({
+                          'message': 'File uploaded successfully',
+                          'fileKey': key,
+                          'downloadUrl': download_url,
+                          'fileName': file_name
+                      })
+                  }
+                  
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
+
+  # API Gateway
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'dmgt-assessment-api-${Environment}'
+      Description: 'DMGT Assessment Form API'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # API Gateway Resources and Methods
+  QuestionsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: questions
+
+  QuestionsTypeResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref QuestionsResource
+      PathPart: '{type}'
+
+  QuestionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref QuestionsTypeResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetQuestionsFunction.Arn}/invocations'
+
+  QuestionsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref QuestionsTypeResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  ResponsesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: responses
+
+  SaveResponseMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ResponsesResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SaveResponseFunction.Arn}/invocations'
+
+  GetResponseResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref ResponsesResource
+      PathPart: '{type}'
+
+  GetResponseCompanyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref GetResponseResource
+      PathPart: '{companyId}'
+
+  GetResponseEmployeeResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !Ref GetResponseCompanyResource
+      PathPart: '{employeeId}'
+
+  GetResponseMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref GetResponseCompanyResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetResponseFunction.Arn}/invocations'
+
+  GetResponseEmployeeMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref GetResponseEmployeeResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetResponseFunction.Arn}/invocations'
+
+  FilesResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref RestApi
+      ParentId: !GetAtt RestApi.RootResourceId
+      PathPart: files
+
+  FileUploadMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref FilesResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FileUploadFunction.Arn}/invocations'
+
+  # API Gateway Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - QuestionsMethod
+      - QuestionsOptionsMethod
+      - SaveResponseMethod
+      - GetResponseMethod
+      - GetResponseEmployeeMethod
+      - FileUploadMethod
+    Properties:
+      RestApiId: !Ref RestApi
+      StageName: !Ref Environment
+
+  # Lambda Permissions
+  GetQuestionsPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetQuestionsFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*'
+
+  SaveResponsePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SaveResponseFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*'
+
+  GetResponsePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetResponseFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*'
+
+  FileUploadPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref FileUploadFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*'
+
+  # CloudWatch Log Groups
+  WebsiteLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/s3/dmgt-assessment-website-${Environment}'
+      RetentionInDays: 30
+
+  GetQuestionsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/dmgt-assessment-get-questions-${Environment}'
+      RetentionInDays: 30
+
+  SaveResponseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/dmgt-assessment-save-response-${Environment}'
+      RetentionInDays: 30
+
+  GetResponseLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/dmgt-assessment-get-response-${Environment}'
+      RetentionInDays: 30
+
+  FileUploadLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/dmgt-assessment-file-upload-${Environment}'
+      RetentionInDays: 30
+
+Outputs:
+  WebsiteBucket:
+    Description: Website S3 bucket name
+    Value: !Ref WebsiteBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-WebsiteBucket'
+
+  ConfigBucket:
+    Description: Config S3 bucket name
+    Value: !Ref ConfigBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ConfigBucket'
+
+  ResponsesBucket:
+    Description: Responses S3 bucket name
+    Value: !Ref ResponsesBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ResponsesBucket'
+
+  FilesBucket:
+    Description: Files S3 bucket name
+    Value: !Ref FilesBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-FilesBucket'
+
+  CloudFrontDistribution:
+    Description: CloudFront Distribution ID
+    Value: !Ref CloudFrontDistribution
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontDistribution'
+
+  CloudFrontUrl:
+    Description: CloudFront Distribution URL
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Export:
+      Name: !Sub '${AWS::StackName}-CloudFrontUrl'
+
+  WebsiteUrl:
+    Description: S3 Website URL
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+    Export:
+      Name: !Sub '${AWS::StackName}-WebsiteUrl'
+
+  ApiGatewayUrl:
+    Description: API Gateway URL
+    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${AWS::StackName}-ApiGatewayUrl'
+
+  Environment:
+    Description: Environment name
+    Value: !Ref Environment
+    Export:
+      Name: !Sub '${AWS::StackName}-Environment'
