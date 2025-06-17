@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useRef, useCallback } from 'react';
+import './forms.css';
 
 interface UploadedFile {
   id: string;
