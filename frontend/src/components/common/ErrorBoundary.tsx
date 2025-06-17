@@ -125,28 +125,28 @@ ${errorReport.componentStack}`;
 
       // Default fallback UI
       return (
-        <div className=\"error-boundary\">
-          <div className=\"error-boundary-container\">
-            <div className=\"error-boundary-content\">
-              <div className=\"error-icon\">
-                <svg width=\"64\" height=\"64\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">
-                  <circle cx=\"12\" cy=\"12\" r=\"10\" stroke=\"#ef4444\" strokeWidth=\"2\" fill=\"none\"/>
-                  <path d=\"m15 9-6 6\" stroke=\"#ef4444\" strokeWidth=\"2\"/>
-                  <path d=\"m9 9 6 6\" stroke=\"#ef4444\" strokeWidth=\"2\"/>
+        <div className="error-boundary">
+          <div className="error-boundary-container">
+            <div className="error-boundary-content">
+              <div className="error-icon">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke="#ef4444" strokeWidth="2" fill="none"/>
+                  <path d="m15 9-6 6" stroke="#ef4444" strokeWidth="2"/>
+                  <path d="m9 9 6 6" stroke="#ef4444" strokeWidth="2"/>
                 </svg>
               </div>
               
-              <h1 className=\"error-title\">Something went wrong</h1>
+              <h1 className="error-title">Something went wrong</h1>
               
-              <p className=\"error-description\">
+              <p className="error-description">
                 We're sorry, but something unexpected happened. This error has been logged 
                 and our team will investigate the issue.
               </p>
 
-              <div className=\"error-actions\">
+              <div className="error-actions">
                 {this.retryCount < this.maxRetries && (
                   <button 
-                    className=\"btn btn-primary\" 
+                    className="btn btn-primary" 
                     onClick={this.handleRetry}
                   >
                     Try Again ({this.maxRetries - this.retryCount} attempts left)
@@ -154,14 +154,14 @@ ${errorReport.componentStack}`;
                 )}
                 
                 <button 
-                  className=\"btn btn-outline\" 
+                  className="btn btn-outline" 
                   onClick={this.handleReload}
                 >
                   Reload Page
                 </button>
                 
                 <button 
-                  className=\"btn btn-outline\" 
+                  className="btn btn-outline" 
                   onClick={this.handleReportError}
                 >
                   Report Error
@@ -169,9 +169,9 @@ ${errorReport.componentStack}`;
               </div>
 
               {process.env.NODE_ENV === 'development' && this.state.error && (
-                <details className=\"error-details\">
+                <details className="error-details">
                   <summary>Error Details (Development)</summary>
-                  <div className=\"error-stack\">
+                  <div className="error-stack">
                     <h3>Error Message:</h3>
                     <pre>{this.state.error.message}</pre>
                     
@@ -188,7 +188,7 @@ ${errorReport.componentStack}`;
                 </details>
               )}
 
-              <div className=\"error-help\">
+              <div className="error-help">
                 <h3>What you can do:</h3>
                 <ul>
                   <li>Try refreshing the page</li>
