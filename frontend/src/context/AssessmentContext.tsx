@@ -1,71 +1,16 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { APIService } from '../services/api';
-
-// Types
-export interface Question {
-  id: string;
-  text: string;
-  type: 'text' | 'textarea' | 'select' | 'multiselect' | 'file' | 'rating' | 'boolean';
-  options?: string[];
-  required?: boolean;
-  category?: string;
-  description?: string;
-  placeholder?: string;
-  maxLength?: number;
-  validation?: {
-    pattern?: string;
-    min?: number;
-    max?: number;
-    fileTypes?: string[];
-    maxFileSize?: number;
-  };
-}
-
-export interface QuestionSet {
-  title: string;
-  description: string;
-  questions: Question[];
-  version: string;
-  lastUpdated: string;
-}
-
-export interface AssessmentResponse {
-  questionId: string;
-  value: string | string[] | number | boolean;
-  fileData?: {
-    fileName: string;
-    fileKey: string;
-    downloadUrl?: string;
-  };
-  timestamp: string;
-}
-
-export interface Assessment {
-  id: string;
-  type: 'Company' | 'Employee';
-  companyId: string;
-  employeeId?: string;
-  responses: AssessmentResponse[];
-  status: 'draft' | 'in-progress' | 'completed' | 'submitted';
-  progress: number;
-  lastSaved: string;
-  metadata: {
-    startedAt: string;
-    completedAt?: string;
-    version: string;
-    userAgent: string;
-    ipAddress?: string;
-  };
-}
-
-export interface AppConfig {
-  apiUrl: string;
-  environment: string;
-  region: string;
-  cloudfrontUrl: string;
-  isDevelopment: boolean;
-  isProduction: boolean;
-}
+import { 
+  Question, 
+  QuestionSet, 
+  AssessmentResponse, 
+  Assessment, 
+  AppConfig,
+  LoadingState,
+  ErrorState,
+  DEFAULT_LOADING_STATE,
+  DEFAULT_ERROR_STATE
+} from '../types';
 
 // State interface
 interface AssessmentState {
@@ -74,16 +19,8 @@ interface AssessmentState {
     Company: QuestionSet | null;
     Employee: QuestionSet | null;
   };
-  loading: {
-    questions: boolean;
-    saving: boolean;
-    uploading: boolean;
-  };
-  errors: {
-    questions: string | null;
-    saving: string | null;
-    uploading: string | null;
-  };
+  loading: LoadingState;
+  errors: ErrorState;
   config: AppConfig;
   autoSaveEnabled: boolean;
   lastAutoSave: string | null;
@@ -92,8 +29,8 @@ interface AssessmentState {
 // Action types
 type AssessmentAction =
   | { type: 'SET_QUESTIONS'; payload: { type: 'Company' | 'Employee'; questions: QuestionSet } }
-  | { type: 'SET_LOADING'; payload: { key: keyof AssessmentState['loading']; value: boolean } }
-  | { type: 'SET_ERROR'; payload: { key: keyof AssessmentState['errors']; value: string | null } }
+  | { type: 'SET_LOADING'; payload: { key: keyof LoadingState; value: boolean } }
+  | { type: 'SET_ERROR'; payload: { key: keyof ErrorState; value: string | null } }
   | { type: 'START_ASSESSMENT'; payload: { type: 'Company' | 'Employee'; companyId: string; employeeId?: string } }
   | { type: 'UPDATE_RESPONSE'; payload: AssessmentResponse }
   | { type: 'SET_ASSESSMENT_STATUS'; payload: Assessment['status'] }
@@ -109,16 +46,8 @@ const initialState: AssessmentState = {
     Company: null,
     Employee: null
   },
-  loading: {
-    questions: false,
-    saving: false,
-    uploading: false
-  },
-  errors: {
-    questions: null,
-    saving: null,
-    uploading: null
-  },
+  loading: DEFAULT_LOADING_STATE,
+  errors: DEFAULT_ERROR_STATE,
   config: {
     apiUrl: '',
     environment: 'dev',
@@ -321,9 +250,18 @@ export const AssessmentProvider: React.FC<{
       console.log(`📋 Loading ${type} questions...`);
       const questions = await APIService.getQuestions(type);
       
+      // Convert array to QuestionSet format
+      const questionSet: QuestionSet = {
+        title: `${type} Assessment`,
+        description: `Data & AI Readiness Assessment for ${type}`,
+        questions,
+        version: '2.0',
+        lastUpdated: new Date().toISOString()
+      };
+      
       dispatch({ 
         type: 'SET_QUESTIONS', 
-        payload: { type, questions } 
+        payload: { type, questions: questionSet } 
       });
       
       console.log(`✅ ${type} questions loaded successfully`);
