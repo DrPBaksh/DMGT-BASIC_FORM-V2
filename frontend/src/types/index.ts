@@ -1,434 +1,420 @@
-// DMGT Assessment Form - TypeScript Interfaces and Types
-// Professional type definitions for enterprise-grade application
+/**
+ * TypeScript Type Definitions for DMGT Assessment Platform
+ * Comprehensive type system ensuring consistency across all components
+ */
 
-export interface Question {
-  id: string;
-  type: QuestionType;
-  title: string;
-  description?: string;
-  required: boolean;
-  options?: string[];
-  validation?: QuestionValidation;
-  fileUpload?: FileUploadConfig;
-  conditional?: ConditionalLogic;
-  section?: string;
-  placeholder?: string;
-  rows?: number;
-  accept?: string;
-  multiple?: boolean;
-  maxSize?: number;
-}
-
-export type QuestionType = 
-  | 'text' 
-  | 'textarea' 
-  | 'radio' 
-  | 'checkbox' 
-  | 'select' 
-  | 'file' 
-  | 'rating' 
-  | 'number' 
-  | 'email' 
-  | 'url'
-  | 'scale';
+// ===== QUESTION TYPES =====
 
 export interface QuestionValidation {
+  required?: boolean;
   minLength?: number;
   maxLength?: number;
   min?: number;
   max?: number;
   pattern?: string;
-  required?: boolean;
   fileTypes?: string[];
-  maxFileSize?: number; // in MB
+  maxFileSize?: number;
 }
 
-export interface FileUploadConfig {
-  allowedTypes: string[];
-  maxSize: number; // in MB
-  multiple: boolean;
+export interface Question {
+  id: string;
+  title: string;
   description?: string;
+  type: 'text' | 'textarea' | 'select' | 'multiselect' | 'file' | 'rating' | 'boolean' | 'number' | 'email';
+  options?: string[];
+  required?: boolean;
+  category?: string;
+  section?: string;
+  placeholder?: string;
+  validation?: QuestionValidation;
+  dependsOn?: string; // Question ID this depends on
+  showIf?: any; // Value that triggers showing this question
 }
 
-export interface ConditionalLogic {
-  dependsOn: string; // question ID
-  condition: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than';
-  value: string | number;
+export interface QuestionSet {
+  title: string;
+  description: string;
+  questions: Question[];
+  version: string;
+  lastUpdated: string;
+}
+
+// ===== RESPONSE TYPES =====
+
+export interface FileData {
+  fileName: string;
+  fileKey: string;
+  downloadUrl?: string;
+  fileSize?: number;
+  contentType?: string;
 }
 
 export interface FormResponse {
-  [questionId: string]: string | string[] | FileUpload[];
-}
-
-export interface FileUpload {
-  fileName: string;
-  fileKey: string;
-  downloadUrl: string;
-  uploadDate: string;
-  fileSize: number;
-  contentType: string;
-}
-
-// New interfaces for form components
-export interface ValidationError {
-  field: string;
-  message: string;
-  code?: string;
-}
-
-export interface UploadedFile {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url?: string;
-  uploadDate?: string;
-}
-
-export interface ProgressData {
-  completed: number;
-  total: number;
-  percentage: number;
+  questionId: string;
+  value: string | string[] | number | boolean | FileData[];
+  timestamp: string;
+  fileData?: FileData;
 }
 
 export interface AssessmentData {
   assessmentType: 'Company' | 'Employee';
   companyId: string;
   employeeId?: string;
-  responses: FormResponse;
-  lastUpdated: string;
-  version: string;
-  progress?: number;
-  isComplete?: boolean;
+  responses: Record<string, any>;
+  metadata?: {
+    startedAt: string;
+    lastUpdated?: string;
+    completedAt?: string;
+    progress: number;
+    status: 'draft' | 'in-progress' | 'completed' | 'submitted';
+  };
 }
 
-export interface SaveRequest {
-  assessmentType: 'Company' | 'Employee';
+// ===== VALIDATION TYPES =====
+
+export interface ValidationError {
+  field: string;
+  message: string;
+  code?: string;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+}
+
+// ===== UI STATE TYPES =====
+
+export interface LoadingState {
+  questions: boolean;
+  saving: boolean;
+  uploading: boolean;
+  submitting: boolean;
+}
+
+export interface ErrorState {
+  questions: string | null;
+  saving: string | null;
+  uploading: string | null;
+  submitting: string | null;
+  general: string | null;
+}
+
+export interface ProgressInfo {
+  completed: number;
+  total: number;
+  percentage: number;
+}
+
+// ===== ASSESSMENT CONTEXT TYPES =====
+
+export interface AssessmentResponse {
+  questionId: string;
+  value: string | string[] | number | boolean;
+  fileData?: FileData;
+  timestamp: string;
+}
+
+export interface Assessment {
+  id: string;
+  type: 'Company' | 'Employee';
   companyId: string;
   employeeId?: string;
-  responses: FormResponse;
-}
-
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  message?: string;
-}
-
-export interface ProgressState {
-  currentSection: number;
-  totalSections: number;
-  completedQuestions: string[];
-  totalQuestions: number;
-  percentComplete: number;
-}
-
-export interface FormState {
-  questions: Question[];
-  responses: FormResponse;
-  progress: ProgressState;
-  isLoading: boolean;
-  isSaving: boolean;
-  lastSaved?: string;
-  hasUnsavedChanges: boolean;
-  errors: FormErrors;
-  uploadingFiles: Set<string>;
-}
-
-export interface FormErrors {
-  [questionId: string]: string;
+  responses: AssessmentResponse[];
+  status: 'draft' | 'in-progress' | 'completed' | 'submitted';
+  progress: number;
+  lastSaved: string;
+  metadata: {
+    startedAt: string;
+    completedAt?: string;
+    version: string;
+    userAgent: string;
+    ipAddress?: string;
+  };
 }
 
 export interface AppConfig {
   apiUrl: string;
-  awsRegion: string;
-  environment: 'dev' | 'prod';
-  autoSaveInterval: number; // in milliseconds
+  environment: string;
+  region: string;
+  cloudfrontUrl: string;
+  isDevelopment: boolean;
+  isProduction: boolean;
 }
 
-export interface CompanyInfo {
-  id: string;
-  name: string;
-  industry?: string;
-  size?: string;
-  region?: string;
-  email?: string;
-  phone?: string;
-  website?: string;
-  description?: string;
-}
+// ===== COMPONENT PROP TYPES =====
 
-export interface EmployeeInfo {
-  id: string;
-  name: string;
-  email?: string;
-  role?: string;
-  department?: string;
-  companyId: string;
-  experience?: string;
-  skills?: string[];
-}
-
-export interface NavigationState {
-  currentPage: 'welcome' | 'company-form' | 'employee-form' | 'completed';
-  assessmentType?: 'Company' | 'Employee';
-  companyInfo?: CompanyInfo;
-  employeeInfo?: EmployeeInfo;
-}
-
-// Form validation utilities
-export interface ValidationResult {
-  isValid: boolean;
-  error?: string;
-}
-
-// API endpoints
-export const API_ENDPOINTS = {
-  GET_QUESTIONS: (type: string) => `/questions/${type}`,
-  SAVE_RESPONSE: '/responses',
-  GET_RESPONSE: (type: string, companyId: string, employeeId?: string) => 
-    employeeId ? `/responses/${type}/${companyId}/${employeeId}` : `/responses/${type}/${companyId}`,
-  UPLOAD_FILE: '/files',
-} as const;
-
-// Application constants
-export const APP_CONSTANTS = {
-  AUTO_SAVE_INTERVAL: 30000, // 30 seconds
-  FILE_UPLOAD_MAX_SIZE: 10, // 10 MB
-  SUPPORTED_FILE_TYPES: [
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    'text/plain',
-    'text/csv'
-  ],
-  MIN_COMPANY_ID_LENGTH: 3,
-  MIN_EMPLOYEE_ID_LENGTH: 2,
-  PROGRESS_STORAGE_KEY: 'dmgt_assessment_progress',
-  LAST_SAVE_STORAGE_KEY: 'dmgt_assessment_last_save'
-} as const;
-
-// Theme and styling types
-export interface ThemeColors {
-  primary: string;
-  primaryDark: string;
-  primaryLight: string;
-  primaryUltraLight: string;
-  white: string;
-  gray50: string;
-  gray100: string;
-  gray200: string;
-  gray300: string;
-  gray400: string;
-  gray500: string;
-  gray600: string;
-  gray700: string;
-  gray800: string;
-  gray900: string;
-  success: string;
-  warning: string;
-  error: string;
-  info: string;
-}
-
-export const THEME_COLORS: ThemeColors = {
-  primary: '#007AFF',
-  primaryDark: '#005cbf',
-  primaryLight: '#4da3ff',
-  primaryUltraLight: '#e6f3ff',
-  white: '#ffffff',
-  gray50: '#fafafa',
-  gray100: '#f5f5f5',
-  gray200: '#e5e5e5',
-  gray300: '#d4d4d4',
-  gray400: '#a3a3a3',
-  gray500: '#737373',
-  gray600: '#525252',
-  gray700: '#404040',
-  gray800: '#262626',
-  gray900: '#171717',
-  success: '#10b981',
-  warning: '#f59e0b',
-  error: '#ef4444',
-  info: '#007AFF'
-};
-
-// Animation and transition constants
-export const ANIMATIONS = {
-  FAST: '0.15s ease-out',
-  NORMAL: '0.25s ease-out',
-  SLOW: '0.35s ease-out',
-  BOUNCE: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-  EASE_OUT_QUART: 'cubic-bezier(0.25, 1, 0.5, 1)',
-  EASE_IN_OUT_QUART: 'cubic-bezier(0.76, 0, 0.24, 1)'
-} as const;
-
-// Responsive breakpoints
-export const BREAKPOINTS = {
-  SM: '640px',
-  MD: '768px',
-  LG: '1024px',
-  XL: '1280px',
-  '2XL': '1536px'
-} as const;
-
-// Error types
-export class AssessmentError extends Error {
-  constructor(
-    message: string,
-    public code: string,
-    public statusCode?: number
-  ) {
-    super(message);
-    this.name = 'AssessmentError';
-  }
-}
-
-export class NetworkError extends AssessmentError {
-  constructor(message: string, statusCode?: number) {
-    super(message, 'NETWORK_ERROR', statusCode);
-    this.name = 'NetworkError';
-  }
-}
-
-export class FileUploadError extends AssessmentError {
-  constructor(message: string, public fileName?: string) {
-    super(message, 'FILE_UPLOAD_ERROR');
-    this.name = 'FileUploadError';
-  }
-}
-
-// Utility types
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-export type RequiredKeys<T, K extends keyof T> = T & Required<Pick<T, K>>;
-
-export type OptionalKeys<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
-// Context types for React
-export interface AssessmentContextType {
-  state: FormState;
-  navigation: NavigationState;
-  config: AppConfig;
-  actions: {
-    updateResponse: (questionId: string, value: string | string[] | FileUpload[]) => void;
-    saveProgress: () => Promise<void>;
-    loadProgress: () => Promise<void>;
-    uploadFile: (questionId: string, file: File) => Promise<FileUpload>;
-    setAssessmentType: (type: 'Company' | 'Employee') => void;
-    setCompanyInfo: (info: CompanyInfo) => void;
-    setEmployeeInfo: (info: EmployeeInfo) => void;
-    validateQuestion: (questionId: string) => ValidationResult;
-    resetForm: () => void;
-    goToPage: (page: NavigationState['currentPage']) => void;
-  };
-}
-
-// Hook return types
-export interface UseFormReturn {
-  formState: FormState;
-  updateResponse: (questionId: string, value: string | string[] | FileUpload[]) => void;
-  saveProgress: () => Promise<void>;
-  loadProgress: () => Promise<void>;
-  validateForm: () => boolean;
-  resetForm: () => void;
-}
-
-export interface UseFileUploadReturn {
-  uploadFile: (questionId: string, file: File) => Promise<FileUpload>;
-  uploadProgress: { [questionId: string]: number };
-  isUploading: (questionId: string) => boolean;
-}
-
-export interface UseAutoSaveReturn {
-  lastSaved: string | null;
-  isSaving: boolean;
-  hasUnsavedChanges: boolean;
-  manualSave: () => Promise<void>;
-}
-
-// Component prop types
-export interface QuestionProps {
+export interface QuestionRendererProps {
   question: Question;
-  value: string | string[] | FileUpload[];
-  onChange: (value: string | string[] | FileUpload[]) => void;
-  onBlur?: () => void;
-  error?: string;
+  value: any;
+  onChange: (value: any) => void;
+  onFileUpload?: (questionId: string, files: FileList) => Promise<void>;
+  error?: ValidationError;
   disabled?: boolean;
-  className?: string;
 }
 
 export interface ProgressBarProps {
-  current: number;
-  total: number;
-  showPercentage?: boolean;
-  animated?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  progress: ProgressInfo;
+  showDetails?: boolean;
   className?: string;
 }
 
-export interface CardProps {
+export interface SaveIndicatorProps {
+  isSaving: boolean;
+  lastSaved: Date | null;
+  autoSaveEnabled?: boolean;
+}
+
+export interface LoadingSpinnerProps {
+  size?: 'small' | 'medium' | 'large';
+  message?: string;
+  className?: string;
+}
+
+export interface ErrorBoundaryProps {
   children: React.ReactNode;
-  header?: React.ReactNode;
-  footer?: React.ReactNode;
-  className?: string;
-  hoverable?: boolean;
-  loading?: boolean;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
+  fallback?: React.ComponentType<{ error: Error; resetError: () => void }>;
 }
 
-export interface ButtonProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
-  loading?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-  type?: 'button' | 'submit' | 'reset';
-  className?: string;
-  icon?: React.ReactNode;
+// ===== API TYPES =====
+
+export interface ApiConfig {
+  baseUrl: string;
+  timeout: number;
+  retryAttempts: number;
+  retryDelay: number;
 }
 
-export interface AlertProps {
-  type: 'success' | 'warning' | 'error' | 'info';
-  title?: string;
+export interface ApiResponse<T = any> {
+  data?: T;
+  error?: string;
+  success: boolean;
+  timestamp: string;
+}
+
+export interface SaveResponseRequest {
+  assessmentType: 'Company' | 'Employee';
+  companyId: string;
+  employeeId?: string;
+  responses: Record<string, any>;
+}
+
+export interface FileUploadRequest {
+  companyId: string;
+  questionId: string;
+  file: File;
+}
+
+export interface FileUploadResponse {
   message: string;
-  dismissible?: boolean;
-  onDismiss?: () => void;
-  className?: string;
+  fileKey: string;
+  downloadUrl: string;
+  fileName: string;
+  fileSize: number;
 }
 
-// Form section types
-export interface FormSection {
-  id: string;
-  title: string;
-  description?: string;
-  questions: Question[];
-  order: number;
+// ===== ROUTE TYPES =====
+
+export interface RouteParams {
+  companyId?: string;
+  employeeId?: string;
+  assessmentType?: 'Company' | 'Employee';
 }
 
-export interface SectionProgress {
-  sectionId: string;
-  completedQuestions: number;
-  totalQuestions: number;
-  isComplete: boolean;
+export interface LocationState {
+  companyName?: string;
+  companyId?: string;
+  employeeName?: string;
+  employeeId?: string;
+  fromPage?: string;
 }
 
-// Export helper functions interface
-export interface FormHelpers {
-  calculateProgress: (responses: FormResponse, questions: Question[]) => ProgressState;
-  validateResponse: (question: Question, value: any) => ValidationResult;
-  formatFileSize: (bytes: number) => string;
-  getFileIcon: (contentType: string) => string;
-  debounce: <T extends (...args: any[]) => any>(func: T, wait: number) => T;
-  throttle: <T extends (...args: any[]) => any>(func: T, wait: number) => T;
+// ===== FORM TYPES =====
+
+export interface FormField {
+  name: string;
+  value: any;
+  error?: string;
+  touched?: boolean;
+  required?: boolean;
 }
+
+export interface FormData {
+  [key: string]: any;
+}
+
+export interface FormState {
+  fields: Record<string, FormField>;
+  isValid: boolean;
+  isSubmitting: boolean;
+  errors: ValidationError[];
+}
+
+// ===== UTILITY TYPES =====
+
+export type AssessmentType = 'Company' | 'Employee';
+
+export type QuestionType = Question['type'];
+
+export type ResponseValue = string | string[] | number | boolean | FileData[];
+
+export type ValidationRule = (value: any, question: Question) => ValidationError | null;
+
+// ===== CONFIGURATION TYPES =====
+
+export interface EnvironmentConfig {
+  apiUrl: string;
+  environment: string;
+  region: string;
+  cloudfrontUrl: string;
+  isDevelopment: boolean;
+  isProduction: boolean;
+  enableDebugLogging: boolean;
+  enablePerformanceTracking: boolean;
+  enableErrorTracking: boolean;
+}
+
+export interface FeatureFlags {
+  fileUpload: boolean;
+  autoSave: boolean;
+  progressTracking: boolean;
+  offlineMode: boolean;
+  analytics: boolean;
+  accessibilityFeatures: boolean;
+}
+
+export interface UIConfig {
+  theme: string;
+  primaryColor: string;
+  animationDuration: number;
+  pageTransitionDelay: number;
+}
+
+// ===== EVENT TYPES =====
+
+export interface AssessmentEvent {
+  type: 'question_answered' | 'section_completed' | 'assessment_started' | 'assessment_completed' | 'file_uploaded';
+  questionId?: string;
+  assessmentId?: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+// ===== HOOK TYPES =====
+
+export interface UseAssessmentReturn {
+  state: {
+    currentAssessment: Assessment | null;
+    questions: Question[];
+    loading: LoadingState;
+    errors: ErrorState;
+  };
+  actions: {
+    startAssessment: (type: AssessmentType, companyId: string, employeeId?: string) => void;
+    loadQuestions: (type: AssessmentType) => Promise<void>;
+    updateResponse: (questionId: string, value: any) => void;
+    saveAssessment: () => Promise<void>;
+    submitAssessment: () => Promise<void>;
+    uploadFile: (questionId: string, file: File) => Promise<void>;
+  };
+  utils: {
+    getResponse: (questionId: string) => AssessmentResponse | undefined;
+    getProgress: () => ProgressInfo;
+    isComplete: () => boolean;
+    validateQuestion: (question: Question, value: any) => ValidationError | null;
+  };
+}
+
+// ===== EXPORT COLLECTIONS =====
+
+export type {
+  // React types for convenience
+  React,
+} from 'react';
+
+// Component prop types collection
+export interface ComponentProps {
+  QuestionRenderer: QuestionRendererProps;
+  ProgressBar: ProgressBarProps;
+  SaveIndicator: SaveIndicatorProps;
+  LoadingSpinner: LoadingSpinnerProps;
+  ErrorBoundary: ErrorBoundaryProps;
+}
+
+// API types collection
+export interface ApiTypes {
+  Config: ApiConfig;
+  Response: ApiResponse;
+  SaveRequest: SaveResponseRequest;
+  FileUploadRequest: FileUploadRequest;
+  FileUploadResponse: FileUploadResponse;
+}
+
+// State types collection
+export interface StateTypes {
+  Assessment: Assessment;
+  Question: Question;
+  Response: AssessmentResponse;
+  Validation: ValidationError;
+  Loading: LoadingState;
+  Error: ErrorState;
+  Progress: ProgressInfo;
+}
+
+// ===== DEFAULT VALUES =====
+
+export const DEFAULT_LOADING_STATE: LoadingState = {
+  questions: false,
+  saving: false,
+  uploading: false,
+  submitting: false,
+};
+
+export const DEFAULT_ERROR_STATE: ErrorState = {
+  questions: null,
+  saving: null,
+  uploading: null,
+  submitting: null,
+  general: null,
+};
+
+export const DEFAULT_PROGRESS: ProgressInfo = {
+  completed: 0,
+  total: 0,
+  percentage: 0,
+};
+
+// ===== TYPE GUARDS =====
+
+export const isQuestion = (obj: any): obj is Question => {
+  return obj && typeof obj.id === 'string' && typeof obj.title === 'string' && typeof obj.type === 'string';
+};
+
+export const isValidationError = (obj: any): obj is ValidationError => {
+  return obj && typeof obj.field === 'string' && typeof obj.message === 'string';
+};
+
+export const isAssessmentResponse = (obj: any): obj is AssessmentResponse => {
+  return obj && typeof obj.questionId === 'string' && obj.value !== undefined && typeof obj.timestamp === 'string';
+};
+
+// ===== UTILITY FUNCTIONS =====
+
+export const createValidationError = (field: string, message: string, code?: string): ValidationError => ({
+  field,
+  message,
+  code,
+});
+
+export const createProgressInfo = (completed: number, total: number): ProgressInfo => ({
+  completed,
+  total,
+  percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
+});
+
+export const createFileData = (fileName: string, fileKey: string, downloadUrl?: string): FileData => ({
+  fileName,
+  fileKey,
+  downloadUrl,
+});
