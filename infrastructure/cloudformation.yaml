@@ -42,7 +42,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
-            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
             MaxAge: 3000
       VersioningConfiguration:
@@ -78,7 +78,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
-            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
             MaxAge: 3000
       VersioningConfiguration:
@@ -97,7 +97,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
-            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
             MaxAge: 3000
       VersioningConfiguration:
@@ -116,7 +116,7 @@ Resources:
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
-            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
             AllowedOrigins: ['*']
             MaxAge: 3000
       VersioningConfiguration:
