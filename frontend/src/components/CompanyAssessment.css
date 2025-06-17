@@ -1,0 +1,451 @@
+/* CompanyAssessment.css - Comprehensive styling for Company Assessment component */
+
+.company-assessment {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Assessment Header */
+.assessment-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+}
+
+.header-content h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.company-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.company-name {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.company-id {
+  font-family: 'Courier New', monospace;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.3rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+/* Progress Section */
+.progress-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Section Navigation */
+.section-navigation {
+  margin-bottom: 2rem;
+}
+
+.section-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.section-tab {
+  background: #f1f5f9;
+  border: none;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  min-width: 180px;
+  position: relative;
+}
+
+.section-tab:hover {
+  background: #e2e8f0;
+  transform: translateY(-2px);
+}
+
+.section-tab.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.tab-title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.tab-count {
+  display: block;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+/* Error Card */
+.error-card {
+  border-left: 4px solid #ef4444;
+  background: #fef2f2;
+  margin-bottom: 2rem;
+}
+
+.error-card .card-header {
+  background: #fee2e2;
+  border-bottom: 1px solid #fecaca;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-card .card-header h3 {
+  color: #dc2626;
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-card ul {
+  margin: 0;
+  padding-left: 1.5rem;
+}
+
+.error-card li {
+  margin-bottom: 0.5rem;
+  color: #dc2626;
+}
+
+/* Assessment Form */
+.assessment-form {
+  margin-bottom: 3rem;
+}
+
+.section-header {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.section-header h2 {
+  margin: 0 0 0.5rem 0;
+  color: #1e293b;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.section-description {
+  color: #64748b;
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+/* Questions */
+.assessment-questions {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.question-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease;
+}
+
+.question-card:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.question-card .card-header {
+  background: linear-gradient(45deg, #f8fafc, #e2e8f0);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.question-title {
+  margin: 0 0 0.5rem 0;
+  color: #1e293b;
+  font-size: 1.3rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.required-indicator {
+  color: #ef4444;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.question-description {
+  margin: 0;
+  color: #64748b;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+/* Actions */
+.assessment-actions {
+  background: white;
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  bottom: 2rem;
+  z-index: 10;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* Button Styles */
+.btn {
+  padding: 0.875rem 2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  min-width: 140px;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.btn-primary:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-outline {
+  background: white;
+  color: #667eea;
+  border: 2px solid #667eea;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #667eea;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btn-outline:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+/* Success Message */
+.success-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-top: 1rem;
+  border: 1px solid #a7f3d0;
+}
+
+.success-icon {
+  font-size: 1.2rem;
+}
+
+/* Loading and Error States */
+.assessment-loading,
+.assessment-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  background: white;
+  border-radius: 12px;
+  margin: 2rem;
+}
+
+.error-content {
+  text-align: center;
+  padding: 3rem;
+}
+
+.error-content h2 {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.error-content p {
+  color: #64748b;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .company-assessment {
+    padding: 1rem;
+  }
+  
+  .header-content h1 {
+    font-size: 2rem;
+  }
+  
+  .company-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .progress-section {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .section-tabs {
+    flex-direction: column;
+  }
+  
+  .section-tab {
+    min-width: auto;
+    width: 100%;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .btn {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .assessment-actions {
+    position: static;
+    margin-top: 2rem;
+  }
+}
+
+/* Form Field Integration */
+.form-field.error {
+  border-color: #ef4444;
+}
+
+.form-field.error .field-input {
+  border-color: #ef4444;
+  background-color: #fef2f2;
+}
+
+/* Animation for smooth transitions */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.question-card {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Focus states for accessibility */
+.btn:focus,
+.section-tab:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .assessment-header {
+    background: #000;
+    color: #fff;
+  }
+  
+  .btn-primary {
+    background: #000;
+    border: 2px solid #fff;
+  }
+  
+  .question-card {
+    border: 2px solid #000;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .question-card {
+    animation: none;
+  }
+  
+  .btn,
+  .section-tab {
+    transition: none;
+  }
+}
