@@ -18,8 +18,8 @@ ENVIRONMENT=""
 FORCE_DEPLOY=false
 INFRASTRUCTURE_ONLY=false
 FRONTEND_ONLY=false
-AWS_REGION="eu-west-2"
-AWS_PROFILE="dmgt-account"  # Default to dmgt-account profile
+AWS_REGION="eu-west-2"  # ✅ EU-West-2 as default
+AWS_PROFILE="dmgt-account"  # ✅ Default to dmgt-account profile
 SKIP_TESTS=false
 VERBOSE=false
 
@@ -139,7 +139,7 @@ fi
 
 # Set environment-specific variables
 STACK_NAME="dmgt-assessment-form-$ENVIRONMENT"
-S3_BUCKET_PREFIX="dmgt-assessment-$ENVIRONMENT"
+S3_BUCKET_PREFIX="dmgt-assessment"
 
 print_status "🚀 Starting Enhanced DMGT Assessment Form deployment"
 print_status "Environment: $ENVIRONMENT"
@@ -200,7 +200,7 @@ check_nodejs() {
     print_success "Node.js $(node --version) and npm $(npm --version) are available"
 }
 
-# Advanced change detection system
+# ✅ ENHANCED CHANGE DETECTION SYSTEM
 create_deployment_cache() {
     mkdir -p .deploy-cache
 }
@@ -345,7 +345,7 @@ deploy_infrastructure() {
     fi
 }
 
-# Enhanced .env file creation with comprehensive configuration
+# ✅ ENHANCED .env FILE CREATION WITH COMPREHENSIVE CONFIGURATION
 create_dynamic_env_file() {
     print_status "⚙️  Generating dynamic .env file with all API endpoints..."
     
@@ -605,7 +605,7 @@ show_deployment_summary() {
     fi
 }
 
-# Main deployment orchestration
+# ✅ MAIN DEPLOYMENT ORCHESTRATION WITH PROPER ORDER
 main() {
     create_deployment_cache
     
@@ -616,7 +616,7 @@ main() {
         check_nodejs
     fi
     
-    # Determine what needs deployment
+    # ✅ DETERMINE WHAT NEEDS DEPLOYMENT WITH CHANGE DETECTION
     local deploy_infrastructure=false
     local deploy_frontend=false
     
@@ -649,7 +649,8 @@ main() {
         fi
     fi
     
-    # Execute deployment steps in correct order
+    # ✅ EXECUTE DEPLOYMENT STEPS IN CORRECT ORDER
+    # 1. Infrastructure → 2. S3 upload → 3. .env generation → 4. Frontend build/deploy
     if [[ "$deploy_infrastructure" == true ]]; then
         deploy_infrastructure
         create_dynamic_env_file
