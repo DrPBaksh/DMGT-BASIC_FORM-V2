@@ -1,355 +1,585 @@
-// DMGT Assessment Form - Welcome Page Component
-// Premium landing page with exceptional design and user experience
+/**
+ * Enhanced WelcomePage Component for DMGT Basic Form V2
+ * Premium design with amazing UX, comprehensive form handling, and configuration integration
+ */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAssessment } from '../context/AssessmentContext';
-import { generateId } from '../utils';
+import { config, isDevelopment } from '../services/config';
+import { getApiService } from '../services/api';
 import './WelcomePage.css';
+
+interface FormData {
+  assessmentType: 'Company' | 'Employee' | '';
+  companyId: string;
+  companyName: string;
+  employeeId: string;
+  employeeName: string;
+  email: string;
+  department: string;
+  role: string;
+}
+
+interface FormErrors {
+  [key: string]: string;
+}
+
+interface ApiHealthStatus {
+  healthy: boolean;
+  responseTime?: number;
+  lastChecked?: string;
+}
 
 const WelcomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { actions } = useAssessment();
+  const [formData, setFormData] = useState<FormData>({
+    assessmentType: '',
+    companyId: '',
+    companyName: '',
+    employeeId: '',
+    employeeName: '',
+    email: '',
+    department: '',
+    role: ''
+  });
   
-  const [selectedType, setSelectedType] = useState<'Company' | 'Employee' | null>(null);
-  const [companyId, setCompanyId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [employeeName, setEmployeeName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiHealth, setApiHealth] = useState<ApiHealthStatus>({ healthy: true });
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const handleTypeSelection = (type: 'Company' | 'Employee') => {
-    setSelectedType(type);
-    // Generate a default company ID if not provided
-    if (!companyId) {
-      setCompanyId(generateId(8));
-    }
-  };
+  // Get app configuration
+  const appConfig = config.getConfig();
+  const appMetadata = config.getAppMetadata();
 
-  const handleStartAssessment = async () => {
-    if (!selectedType || !companyId || !companyName) {
-      return;
-    }
-
-    if (selectedType === 'Employee' && (!employeeId || !employeeName)) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      // Set assessment type
-      actions.setAssessmentType(selectedType);
-
-      // Set company information
-      actions.setCompanyInfo({
-        id: companyId.trim(),
-        name: companyName.trim()
-      });
-
-      // Set employee information if applicable
-      if (selectedType === 'Employee' && employeeId && employeeName) {
-        actions.setEmployeeInfo({
-          id: employeeId.trim(),
-          name: employeeName.trim(),
-          companyId: companyId.trim()
+  /**
+   * API health check on component mount
+   */
+  useEffect(() => {
+    const checkApiHealth = async () => {
+      try {
+        const apiService = getApiService();
+        const healthResult = await apiService.checkHealth();
+        setApiHealth({
+          healthy: healthResult.healthy,
+          responseTime: healthResult.details?.responseTime,
+          lastChecked: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('API health check failed:', error);
+        setApiHealth({ 
+          healthy: false, 
+          lastChecked: new Date().toISOString() 
         });
       }
+    };
+
+    checkApiHealth();
+  }, []);
+
+  /**
+   * Form validation with comprehensive checks
+   */
+  const validateForm = useMemo(() => {
+    return (data: FormData): FormErrors => {
+      const newErrors: FormErrors = {};
+
+      // Assessment type validation
+      if (!data.assessmentType) {
+        newErrors.assessmentType = 'Please select an assessment type';
+      }
+
+      // Company information validation
+      if (!data.companyId.trim()) {
+        newErrors.companyId = 'Company ID is required';
+      } else if (data.companyId.length < 2) {
+        newErrors.companyId = 'Company ID must be at least 2 characters';
+      } else if (!/^[a-zA-Z0-9_-]+$/.test(data.companyId)) {
+        newErrors.companyId = 'Company ID can only contain letters, numbers, hyphens, and underscores';
+      }
+
+      if (!data.companyName.trim()) {
+        newErrors.companyName = 'Company name is required';
+      } else if (data.companyName.length < 2) {
+        newErrors.companyName = 'Company name must be at least 2 characters';
+      }
+
+      // Employee-specific validation
+      if (data.assessmentType === 'Employee') {
+        if (!data.employeeId.trim()) {
+          newErrors.employeeId = 'Employee ID is required for employee assessments';
+        } else if (data.employeeId.length < 2) {
+          newErrors.employeeId = 'Employee ID must be at least 2 characters';
+        } else if (!/^[a-zA-Z0-9_-]+$/.test(data.employeeId)) {
+          newErrors.employeeId = 'Employee ID can only contain letters, numbers, hyphens, and underscores';
+        }
+
+        if (!data.employeeName.trim()) {
+          newErrors.employeeName = 'Employee name is required for employee assessments';
+        } else if (data.employeeName.length < 2) {
+          newErrors.employeeName = 'Employee name must be at least 2 characters';
+        }
+
+        if (!data.email.trim()) {
+          newErrors.email = 'Email is required for employee assessments';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+          newErrors.email = 'Please enter a valid email address';
+        }
+
+        if (!data.department.trim()) {
+          newErrors.department = 'Department is required for employee assessments';
+        }
+
+        if (!data.role.trim()) {
+          newErrors.role = 'Role is required for employee assessments';
+        }
+      }
+
+      return newErrors;
+    };
+  }, []);
+
+  /**
+   * Handle form field changes with real-time validation
+   */
+  const handleInputChange = (field: keyof FormData) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const value = event.target.value;
+    
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value };
+      
+      // Clear related errors when user starts typing
+      const newErrors = { ...errors };
+      delete newErrors[field];
+      
+      // Special handling for assessment type change
+      if (field === 'assessmentType' && value !== prev.assessmentType) {
+        // Clear employee-specific fields if switching to company assessment
+        if (value === 'Company') {
+          updated.employeeId = '';
+          updated.employeeName = '';
+          updated.email = '';
+          updated.department = '';
+          updated.role = '';
+          
+          // Clear employee-specific errors
+          delete newErrors.employeeId;
+          delete newErrors.employeeName;
+          delete newErrors.email;
+          delete newErrors.department;
+          delete newErrors.role;
+        }
+      }
+      
+      setErrors(newErrors);
+      return updated;
+    });
+  };
+
+  /**
+   * Generate smart suggestions for company/employee IDs
+   */
+  const generateSuggestions = (type: 'company' | 'employee') => {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substr(2, 4);
+    
+    if (type === 'company') {
+      const baseName = formData.companyName.toLowerCase().replace(/[^a-z0-9]/g, '').substr(0, 8);
+      return baseName ? `${baseName}-${timestamp}` : `company-${timestamp}`;
+    } else {
+      const baseName = formData.employeeName.toLowerCase().replace(/[^a-z0-9]/g, '').substr(0, 6);
+      return baseName ? `${baseName}-${random}` : `emp-${random}`;
+    }
+  };
+
+  /**
+   * Handle form submission with comprehensive validation
+   */
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    
+    // Validate form
+    const formErrors = validateForm(formData);
+    
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      
+      // Focus on first error field
+      const firstErrorField = Object.keys(formErrors)[0];
+      const fieldElement = document.querySelector(`[name="${firstErrorField}"]`) as HTMLElement;
+      fieldElement?.focus();
+      
+      return;
+    }
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      // Check API health before proceeding
+      if (!apiHealth.healthy && !isDevelopment()) {
+        throw new Error('API service is currently unavailable. Please try again later.');
+      }
+
+      // Simulate loading for better UX
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Navigate to appropriate assessment
-      const route = selectedType === 'Company' ? '/company-assessment' : '/employee-assessment';
-      navigate(route);
-
+      if (formData.assessmentType === 'Company') {
+        navigate(`/company/${formData.companyId}`, {
+          state: {
+            companyName: formData.companyName,
+            companyId: formData.companyId
+          }
+        });
+      } else {
+        navigate(`/employee/${formData.companyId}/${formData.employeeId}`, {
+          state: {
+            companyName: formData.companyName,
+            companyId: formData.companyId,
+            employeeName: formData.employeeName,
+            employeeId: formData.employeeId,
+            email: formData.email,
+            department: formData.department,
+            role: formData.role
+          }
+        });
+      }
+      
     } catch (error) {
-      console.error('Failed to start assessment:', error);
-      setIsSubmitting(false);
+      console.error('Form submission error:', error);
+      setErrors({
+        submit: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const isFormValid = () => {
-    if (!selectedType || !companyId.trim() || !companyName.trim()) {
-      return false;
-    }
-
-    if (selectedType === 'Employee') {
-      return employeeId.trim() && employeeName.trim();
-    }
-
-    return true;
-  };
+  /**
+   * Input field component with enhanced styling
+   */
+  const InputField: React.FC<{
+    name: keyof FormData;
+    label: string;
+    type?: string;
+    placeholder?: string;
+    required?: boolean;
+    showSuggestion?: boolean;
+    suggestionType?: 'company' | 'employee';
+  }> = ({ name, label, type = 'text', placeholder, required, showSuggestion, suggestionType }) => (
+    <div className="form-group">
+      <label htmlFor={name} className="form-label">
+        {label}
+        {required && <span className="required">*</span>}
+      </label>
+      <div className="input-wrapper">
+        <input
+          id={name}
+          name={name}
+          type={type}
+          value={formData[name]}
+          onChange={handleInputChange(name)}
+          placeholder={placeholder}
+          className={`form-input ${errors[name] ? 'error' : ''}`}
+          aria-describedby={errors[name] ? `${name}-error` : undefined}
+        />
+        {showSuggestion && suggestionType && (
+          <button
+            type="button"
+            className="suggestion-button"
+            onClick={() => {
+              const suggestion = generateSuggestions(suggestionType);
+              setFormData(prev => ({ ...prev, [name]: suggestion }));
+              setErrors(prev => ({ ...prev, [name]: '' }));
+            }}
+            title="Generate suggestion"
+          >
+            ✨
+          </button>
+        )}
+      </div>
+      {errors[name] && (
+        <div id={`${name}-error`} className="form-error" role="alert">
+          {errors[name]}
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <div className=\"welcome-page\">
-      <div className=\"page-container\">
-        {/* Hero Section */}
-        <section className=\"hero-section\">
-          <div className=\"hero-content\">
-            <h1 className=\"hero-title\">
-              Data & AI Readiness Assessment
-            </h1>
-            <p className=\"hero-subtitle\">
-              Evaluate your organization's data and artificial intelligence capabilities 
-              with our comprehensive assessment platform designed for enterprise excellence.
-            </p>
-            
-            <div className=\"hero-features\">
-              <div className=\"hero-feature\">
-                <div className=\"hero-feature-icon\">📊</div>
-                <h3 className=\"hero-feature-title\">Comprehensive Analysis</h3>
-                <p className=\"hero-feature-description\">
-                  In-depth evaluation of data infrastructure, AI capabilities, and organizational readiness
-                </p>
-              </div>
-              
-              <div className=\"hero-feature\">
-                <div className=\"hero-feature-icon\">🎯</div>
-                <h3 className=\"hero-feature-title\">Actionable Insights</h3>
-                <p className=\"hero-feature-description\">
-                  Receive detailed recommendations and strategic guidance for your digital transformation
-                </p>
-              </div>
-              
-              <div className=\"hero-feature\">
-                <div className=\"hero-feature-icon\">🚀</div>
-                <h3 className=\"hero-feature-title\">Enterprise Ready</h3>
-                <p className=\"hero-feature-description\">
-                  Professional-grade assessment platform designed for organizations of all sizes
-                </p>
-              </div>
-            </div>
+    <div className="welcome-page">
+      {/* Hero Section */}
+      <div className="hero-section">
+        <div className="hero-content">
+          <div className="hero-badge">
+            <span className="badge-text">Enterprise Assessment Platform</span>
+            <span className="badge-version">v{appMetadata.version}</span>
           </div>
-        </section>
-
-        {/* Assessment Selection */}
-        <section className=\"assessment-selection\">
-          <h2 className=\"section-title\">Choose Your Assessment Type</h2>
-          <p className=\"section-description\">
-            Select the assessment that best fits your role and objectives
+          
+          <h1 className="hero-title">
+            {appConfig.appName}
+          </h1>
+          
+          <p className="hero-description">
+            Comprehensive evaluation tool for organizational data and AI readiness. 
+            Choose your assessment type to begin your journey toward digital transformation excellence.
           </p>
 
-          <div className=\"assessment-types\">
-            {/* Company Assessment Card */}
-            <div 
-              className={`assessment-card ${selectedType === 'Company' ? 'selected' : ''}`}
-              onClick={() => handleTypeSelection('Company')}
-            >
-              <div className=\"assessment-card-header\">
-                <div className=\"assessment-card-icon\">🏢</div>
-                <h3 className=\"assessment-card-title\">Company Assessment</h3>
-                <p className=\"assessment-card-subtitle\">Organizational Level</p>
-              </div>
-              
-              <p className=\"assessment-card-description\">
-                Comprehensive evaluation of your organization's data and AI strategy, 
-                infrastructure, governance, and overall readiness for digital transformation.
-              </p>
-              
-              <ul className=\"assessment-card-features\">
-                <li>Strategic alignment and vision</li>
-                <li>Data infrastructure assessment</li>
-                <li>AI capabilities evaluation</li>
-                <li>Governance and compliance review</li>
-                <li>Organizational readiness analysis</li>
-              </ul>
-              
-              <div className=\"assessment-card-details\">
-                <div className=\"detail-item\">
-                  <span className=\"detail-label\">Duration:</span>
-                  <span className=\"detail-value\">25-35 minutes</span>
-                </div>
-                <div className=\"detail-item\">
-                  <span className=\"detail-label\">Sections:</span>
-                  <span className=\"detail-value\">5 comprehensive areas</span>
-                </div>
-                <div className=\"detail-item\">
-                  <span className=\"detail-label\">Access:</span>
-                  <span className=\"detail-value\">One per company</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Employee Assessment Card */}
-            <div 
-              className={`assessment-card ${selectedType === 'Employee' ? 'selected' : ''}`}
-              onClick={() => handleTypeSelection('Employee')}
-            >
-              <div className=\"assessment-card-header\">
-                <div className=\"assessment-card-icon\">👤</div>
-                <h3 className=\"assessment-card-title\">Employee Assessment</h3>
-                <p className=\"assessment-card-subtitle\">Individual Level</p>
-              </div>
-              
-              <p className=\"assessment-card-description\">
-                Personal assessment to evaluate your individual skills, experience, and 
-                readiness to contribute to data and AI initiatives within your organization.
-              </p>
-              
-              <ul className=\"assessment-card-features\">
-                <li>Technical skills and experience</li>
-                <li>Data analytics capabilities</li>
-                <li>AI/ML familiarity and exposure</li>
-                <li>Learning and development goals</li>
-                <li>Workplace application opportunities</li>
-              </ul>
-              
-              <div className=\"assessment-card-details\">
-                <div className=\"detail-item\">
-                  <span className=\"detail-label\">Duration:</span>
-                  <span className=\"detail-value\">15-25 minutes</span>
-                </div>
-                <div className=\"detail-item\">
-                  <span className=\"detail-label\">Sections:</span>
-                  <span className=\"detail-value\">6 focused areas</span>
-                </div>
-                <div className=\"detail-item\">
-                  <span className=\"detail-label\">Access:</span>
-                  <span className=\"detail-value\">Multiple per company</span>
-                </div>
-              </div>
+          {/* API Health Indicator */}
+          <div className={`api-status ${apiHealth.healthy ? 'healthy' : 'unhealthy'}`}>
+            <div className="status-indicator">
+              <div className="status-dot"></div>
+              <span className="status-text">
+                {apiHealth.healthy ? 'Systems Operational' : 'Limited Connectivity'}
+              </span>
+              {apiHealth.responseTime && (
+                <span className="response-time">({apiHealth.responseTime}ms)</span>
+              )}
             </div>
           </div>
-        </section>
+        </div>
+      </div>
 
-        {/* Information Form */}
-        {selectedType && (
-          <section className=\"information-form\">
-            <div className=\"form-wrapper\">
-              <div className=\"form-card\">
-                <h3 className=\"form-title\">
-                  {selectedType === 'Company' ? 'Company Information' : 'Your Information'}
-                </h3>
-                <p className=\"form-description\">
-                  Please provide the following information to begin your assessment
-                </p>
+      {/* Assessment Selection */}
+      <div className="assessment-section">
+        <div className="section-header">
+          <h2>Choose Your Assessment Type</h2>
+          <p>Select the assessment that best matches your needs</p>
+        </div>
 
-                <div className=\"form-fields\">
-                  {/* Company Information */}
-                  <div className=\"form-group\">
-                    <label className=\"form-label required\" htmlFor=\"companyId\">
-                      Company ID
-                    </label>
-                    <input
-                      id=\"companyId\"
-                      type=\"text\"
-                      className=\"form-input\"
-                      value={companyId}
-                      onChange={(e) => setCompanyId(e.target.value)}
-                      placeholder=\"Enter a unique identifier for your company\"
+        <div className="assessment-options">
+          <div 
+            className={`assessment-card ${formData.assessmentType === 'Company' ? 'selected' : ''}`}
+            onClick={() => handleInputChange('assessmentType')({ target: { value: 'Company' } } as any)}
+          >
+            <div className="card-icon">🏢</div>
+            <h3>Company Assessment</h3>
+            <p>Evaluate your organization's overall data and AI readiness across all departments and systems.</p>
+            <ul className="features-list">
+              <li>Enterprise-wide evaluation</li>
+              <li>Strategic readiness analysis</li>
+              <li>Infrastructure assessment</li>
+              <li>Governance framework review</li>
+            </ul>
+            <div className="card-footer">
+              <span className="duration">⏱️ 15-20 minutes</span>
+              <span className="audience">👥 Leadership team</span>
+            </div>
+          </div>
+
+          <div 
+            className={`assessment-card ${formData.assessmentType === 'Employee' ? 'selected' : ''}`}
+            onClick={() => handleInputChange('assessmentType')({ target: { value: 'Employee' } } as any)}
+          >
+            <div className="card-icon">👤</div>
+            <h3>Employee Assessment</h3>
+            <p>Assess individual skills, knowledge, and experience with data and AI technologies.</p>
+            <ul className="features-list">
+              <li>Personal skill evaluation</li>
+              <li>Role-specific questions</li>
+              <li>Training needs identification</li>
+              <li>Career development insights</li>
+            </ul>
+            <div className="card-footer">
+              <span className="duration">⏱️ 10-15 minutes</span>
+              <span className="audience">👤 Individual contributors</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Form Section */}
+      {formData.assessmentType && (
+        <div className="form-section">
+          <div className="form-container">
+            <div className="form-header">
+              <h2>
+                {formData.assessmentType === 'Company' ? '🏢 Company Information' : '👤 Participant Information'}
+              </h2>
+              <p>Please provide the required information to begin your assessment</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="assessment-form" noValidate>
+              {/* Company Information */}
+              <div className="form-section-group">
+                <h3>Company Details</h3>
+                
+                <div className="form-row">
+                  <InputField
+                    name="companyName"
+                    label="Company Name"
+                    placeholder="Enter your company name"
+                    required
+                  />
+                  <InputField
+                    name="companyId"
+                    label="Company ID"
+                    placeholder="Unique identifier for your company"
+                    required
+                    showSuggestion
+                    suggestionType="company"
+                  />
+                </div>
+              </div>
+
+              {/* Employee Information (if Employee assessment) */}
+              {formData.assessmentType === 'Employee' && (
+                <div className="form-section-group">
+                  <h3>Employee Details</h3>
+                  
+                  <div className="form-row">
+                    <InputField
+                      name="employeeName"
+                      label="Full Name"
+                      placeholder="Enter your full name"
                       required
                     />
-                    <p className=\"form-help\">
-                      This ID will be used to link assessments. Use a consistent identifier across all employees.
-                    </p>
+                    <InputField
+                      name="employeeId"
+                      label="Employee ID"
+                      placeholder="Unique employee identifier"
+                      required
+                      showSuggestion
+                      suggestionType="employee"
+                    />
                   </div>
 
-                  <div className=\"form-group\">
-                    <label className=\"form-label required\" htmlFor=\"companyName\">
-                      Company Name
-                    </label>
-                    <input
-                      id=\"companyName\"
-                      type=\"text\"
-                      className=\"form-input\"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder=\"Enter your company name\"
+                  <div className="form-row">
+                    <InputField
+                      name="email"
+                      label="Email Address"
+                      type="email"
+                      placeholder="your.email@company.com"
+                      required
+                    />
+                    <InputField
+                      name="department"
+                      label="Department"
+                      placeholder="e.g., Engineering, Marketing, Sales"
                       required
                     />
                   </div>
 
-                  {/* Employee Information (only for Employee assessment) */}
-                  {selectedType === 'Employee' && (
+                  <InputField
+                    name="role"
+                    label="Job Title/Role"
+                    placeholder="e.g., Software Engineer, Data Analyst, Manager"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Advanced Options */}
+              <div className="advanced-section">
+                <button
+                  type="button"
+                  className="advanced-toggle"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                >
+                  <span>Advanced Options</span>
+                  <span className={`toggle-icon ${showAdvanced ? 'expanded' : ''}`}>▼</span>
+                </button>
+
+                {showAdvanced && (
+                  <div className="advanced-content">
+                    <div className="info-box">
+                      <h4>Configuration Information</h4>
+                      <div className="config-grid">
+                        <div className="config-item">
+                          <span className="config-label">Environment:</span>
+                          <span className="config-value">{appConfig.environment}</span>
+                        </div>
+                        <div className="config-item">
+                          <span className="config-label">Region:</span>
+                          <span className="config-value">{config.getAwsConfig().region}</span>
+                        </div>
+                        <div className="config-item">
+                          <span className="config-label">API Status:</span>
+                          <span className={`config-value ${apiHealth.healthy ? 'healthy' : 'error'}`}>
+                            {apiHealth.healthy ? 'Connected' : 'Disconnected'}
+                          </span>
+                        </div>
+                        <div className="config-item">
+                          <span className="config-label">Version:</span>
+                          <span className="config-value">{appMetadata.version}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Errors */}
+              {errors.submit && (
+                <div className="form-error-banner" role="alert">
+                  <div className="error-icon">⚠️</div>
+                  <div className="error-content">
+                    <strong>Submission Error</strong>
+                    <p>{errors.submit}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <div className="form-actions">
+                <button
+                  type="submit"
+                  className={`btn btn-primary btn-lg ${isLoading ? 'loading' : ''}`}
+                  disabled={isLoading || !formData.assessmentType}
+                >
+                  {isLoading ? (
                     <>
-                      <div className=\"form-group\">
-                        <label className=\"form-label required\" htmlFor=\"employeeId\">
-                          Employee ID
-                        </label>
-                        <input
-                          id=\"employeeId\"
-                          type=\"text\"
-                          className=\"form-input\"
-                          value={employeeId}
-                          onChange={(e) => setEmployeeId(e.target.value)}
-                          placeholder=\"Enter your employee ID or unique identifier\"
-                          required
-                        />
-                      </div>
-
-                      <div className=\"form-group\">
-                        <label className=\"form-label required\" htmlFor=\"employeeName\">
-                          Your Name
-                        </label>
-                        <input
-                          id=\"employeeName\"
-                          type=\"text\"
-                          className=\"form-input\"
-                          value={employeeName}
-                          onChange={(e) => setEmployeeName(e.target.value)}
-                          placeholder=\"Enter your full name\"
-                          required
-                        />
-                      </div>
+                      <span className="loading-spinner"></span>
+                      <span>Preparing Assessment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Begin Assessment</span>
+                      <span className="submit-icon">→</span>
                     </>
                   )}
-                </div>
-
-                <div className=\"form-actions\">
-                  <button
-                    className=\"btn btn-primary btn-large\"
-                    onClick={handleStartAssessment}
-                    disabled={!isFormValid() || isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className=\"btn-spinner\"></div>
-                        Starting Assessment...
-                      </>
-                    ) : (
-                      `Start ${selectedType} Assessment`
-                    )}
-                  </button>
-                  
-                  <button
-                    className=\"btn btn-outline\"
-                    onClick={() => setSelectedType(null)}
-                    disabled={isSubmitting}
-                  >
-                    Change Assessment Type
-                  </button>
-                </div>
+                </button>
               </div>
-            </div>
-          </section>
-        )}
-
-        {/* Additional Information */}
-        <section className=\"additional-info\">
-          <div className=\"info-grid\">
-            <div className=\"info-card\">
-              <h3>🔒 Privacy & Security</h3>
-              <p>
-                Your responses are encrypted and stored securely. We follow enterprise-grade 
-                security practices to protect your data.
-              </p>
-            </div>
-            
-            <div className=\"info-card\">
-              <h3>📊 Detailed Reports</h3>
-              <p>
-                Receive comprehensive analysis with actionable recommendations 
-                tailored to your organization's needs.
-              </p>
-            </div>
-            
-            <div className=\"info-card\">
-              <h3>🎯 Benchmarking</h3>
-              <p>
-                Compare your results against industry standards and best practices 
-                to identify improvement opportunities.
-              </p>
-            </div>
+            </form>
           </div>
-        </section>
+        </div>
+      )}
+
+      {/* Features Section */}
+      <div className="features-section">
+        <div className="section-header">
+          <h2>Why Choose Our Assessment Platform?</h2>
+          <p>Enterprise-grade features designed for comprehensive evaluation</p>
+        </div>
+
+        <div className="features-grid">
+          <div className="feature-card">
+            <div className="feature-icon">🔒</div>
+            <h3>Secure & Private</h3>
+            <p>Enterprise-grade security with encrypted data transmission and secure cloud storage.</p>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon">📊</div>
+            <h3>Comprehensive Analysis</h3>
+            <p>In-depth evaluation covering all aspects of data and AI readiness across your organization.</p>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon">⚡</div>
+            <h3>Fast & Efficient</h3>
+            <p>Streamlined assessment process with intelligent question routing and auto-save functionality.</p>
+          </div>
+
+          <div className="feature-card">
+            <div className="feature-icon">📈</div>
+            <h3>Actionable Insights</h3>
+            <p>Detailed reports with specific recommendations for improving your data and AI capabilities.</p>
+          </div>
+        </div>
       </div>
     </div>
   );
