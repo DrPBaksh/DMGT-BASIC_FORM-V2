@@ -2,7 +2,7 @@
   "name": "dmgt-assessment-form",
   "version": "1.0.0",
   "description": "DMGT Data & AI Readiness Assessment Form - Professional React Application",
-  "main": "src/index.js",
+  "main": "src/index.tsx",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
