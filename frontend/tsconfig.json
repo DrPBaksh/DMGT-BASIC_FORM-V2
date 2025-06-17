@@ -1,0 +1,60 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "es6",
+      "es2020"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": "src",
+    "paths": {
+      "@/*": ["*"],
+      "@/components/*": ["components/*"],
+      "@/context/*": ["context/*"],
+      "@/services/*": ["services/*"],
+      "@/types/*": ["types/*"],
+      "@/utils/*": ["utils/*"]
+    },
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ],
+    "declaration": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUncheckedIndexedAccess": false
+  },
+  "include": [
+    "src/**/*",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.js",
+    "src/**/*.jsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    "**/*.test.*",
+    "**/*.spec.*"
+  ]
+}
