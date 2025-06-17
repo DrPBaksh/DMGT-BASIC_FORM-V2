@@ -72,9 +72,9 @@ Resources:
       BucketName: !Sub '${BucketPrefix}-config-${AWS::AccountId}-${Environment}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: true
+        BlockPublicPolicy: false  # Allow bucket policies
         IgnorePublicAcls: true
-        RestrictPublicBuckets: true
+        RestrictPublicBuckets: false  # Allow bucket policies
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -83,6 +83,35 @@ Resources:
             MaxAge: 3000
       VersioningConfiguration:
         Status: Enabled
+
+  # S3 Bucket Policy for ConfigBucket to allow deployment uploads
+  ConfigBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ConfigBucket
+      PolicyDocument:
+        Statement:
+          - Sid: AllowLambdaAccess
+            Effect: Allow
+            Principal:
+              AWS: !GetAtt LambdaExecutionRole.Arn
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+            Resource: !Sub 'arn:aws:s3:::${ConfigBucket}/*'
+          - Sid: AllowDeploymentAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+            Resource:
+              - !Sub 'arn:aws:s3:::${ConfigBucket}'
+              - !Sub 'arn:aws:s3:::${ConfigBucket}/*'
 
   # S3 Bucket for storing user assessment responses
   ResponsesBucket:
