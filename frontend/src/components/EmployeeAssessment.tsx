@@ -6,18 +6,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssessment } from '../context/AssessmentContext';
-import { apiService } from '../services/api';
-import { Question, FormResponse, ValidationError } from '../types';
+import { getApiService } from '../services/api';
+import { Question, ValidationError, ProgressInfo } from '../types';
 import LoadingSpinner from './common/LoadingSpinner';
 import QuestionRenderer from './forms/QuestionRenderer';
 import ProgressBar from './forms/ProgressBar';
 import SaveIndicator from './forms/SaveIndicator';
-import FileUpload from './forms/FileUpload';
 
 const EmployeeAssessment: React.FC = () => {
   const { companyId, employeeId } = useParams<{ companyId: string; employeeId?: string }>();
   const navigate = useNavigate();
-  const { state, navigation, actions } = useAssessment();
+  const { state, startAssessment, loadQuestions, updateResponse, saveAssessment } = useAssessment();
 
   // Local state
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -27,6 +26,8 @@ const EmployeeAssessment: React.FC = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
+
+  const apiService = getApiService();
 
   // Auto-save interval
   useEffect(() => {
@@ -39,23 +40,26 @@ const EmployeeAssessment: React.FC = () => {
     return () => clearInterval(interval);
   }, [responses, isSaving]);
 
-  // Load previous responses on mount
+  // Load questions on mount
   useEffect(() => {
-    if (companyId && employeeId) {
-      loadPreviousResponses();
+    if (companyId) {
+      loadQuestions('Employee');
+      if (employeeId) {
+        loadPreviousResponses();
+      }
     }
-  }, [companyId, employeeId]);
+  }, [companyId, employeeId, loadQuestions]);
 
   const loadPreviousResponses = async () => {
     if (!companyId || !employeeId) return;
 
     try {
-      const savedResponses = await apiService.getEmployeeResponses(companyId, employeeId);
+      const savedResponses = await apiService.getResponse('Employee', companyId, employeeId);
       if (savedResponses && Object.keys(savedResponses).length > 0) {
         setResponses(savedResponses);
         
         // Find the first unanswered question
-        const firstUnanswered = state.questions.findIndex(q => !savedResponses[q.id]);
+        const firstUnanswered = state.questions.Employee?.questions.findIndex(q => !savedResponses[q.id]) || 0;
         if (firstUnanswered >= 0) {
           setCurrentQuestionIndex(firstUnanswered);
         }
@@ -70,14 +74,19 @@ const EmployeeAssessment: React.FC = () => {
 
     setIsSaving(true);
     try {
-      await apiService.saveEmployeeResponses(companyId, employeeId, responses);
+      await apiService.saveResponse({
+        assessmentType: 'Employee',
+        companyId,
+        employeeId,
+        responses
+      });
       setLastSaved(new Date());
     } catch (error) {
       console.error('Auto-save failed:', error);
     } finally {
       setIsSaving(false);
     }
-  }, [companyId, employeeId, responses]);
+  }, [companyId, employeeId, responses, apiService]);
 
   const handleManualSave = async () => {
     await handleAutoSave();
@@ -169,7 +178,7 @@ const EmployeeAssessment: React.FC = () => {
   const validateAllQuestions = (): ValidationError[] => {
     const errors: ValidationError[] = [];
     
-    state.questions.forEach(question => {
+    state.questions.Employee?.questions.forEach(question => {
       const value = responses[question.id];
       const error = validateQuestion(question, value);
       if (error) {
@@ -194,13 +203,15 @@ const EmployeeAssessment: React.FC = () => {
     setIsSubmitting(true);
     try {
       // Final save before submission
-      await apiService.saveEmployeeResponses(companyId, employeeId, responses);
-      
-      // Submit assessment
-      await apiService.submitEmployeeAssessment(companyId, employeeId, responses);
+      await apiService.saveResponse({
+        assessmentType: 'Employee',
+        companyId,
+        employeeId,
+        responses
+      });
       
       // Navigate to completion page
-      navigate(`/complete/employee/${companyId}/${employeeId}`);
+      navigate(`/complete/Employee/${companyId}/${employeeId}`);
     } catch (error) {
       console.error('Submission failed:', error);
       // Show error message to user
@@ -216,7 +227,8 @@ const EmployeeAssessment: React.FC = () => {
   };
 
   const handleNextQuestion = () => {
-    if (currentQuestionIndex < state.questions.length - 1) {
+    const totalQuestions = state.questions.Employee?.questions.length || 0;
+    if (currentQuestionIndex < totalQuestions - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     }
   };
@@ -232,9 +244,9 @@ const EmployeeAssessment: React.FC = () => {
     }
   };
 
-  const calculateProgress = () => {
-    const totalQuestions = state.questions.length;
-    const answeredQuestions = state.questions.filter(q => responses[q.id] !== undefined).length;
+  const calculateProgress = (): ProgressInfo => {
+    const totalQuestions = state.questions.Employee?.questions.length || 0;
+    const answeredQuestions = state.questions.Employee?.questions.filter(q => responses[q.id] !== undefined).length || 0;
     return {
       completed: answeredQuestions,
       total: totalQuestions,
@@ -243,11 +255,12 @@ const EmployeeAssessment: React.FC = () => {
   };
 
   const progress = calculateProgress();
-  const currentQuestion = state.questions[currentQuestionIndex];
+  const questions = state.questions.Employee?.questions || [];
+  const currentQuestion = questions[currentQuestionIndex];
   const currentValue = currentQuestion ? responses[currentQuestion.id] : undefined;
   const currentError = validationErrors.find(error => error.field === currentQuestion?.id);
 
-  if (state.isLoading) {
+  if (state.loading.questions) {
     return (
       <div className="page-container">
         <LoadingSpinner 
@@ -258,26 +271,7 @@ const EmployeeAssessment: React.FC = () => {
     );
   }
 
-  if (!navigation.employeeInfo || !navigation.companyInfo) {
-    return (
-      <div className="page-container">
-        <div className="card">
-          <div className="card-body">
-            <h2>Employee Information Required</h2>
-            <p>Please complete the employee information form before starting the assessment.</p>
-            <button 
-              className="btn btn-primary"
-              onClick={() => navigate(`/employee/${companyId}`)}
-            >
-              Complete Employee Information
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (state.questions.length === 0) {
+  if (questions.length === 0) {
     return (
       <div className="page-container">
         <div className="card">
@@ -297,7 +291,7 @@ const EmployeeAssessment: React.FC = () => {
         <div className="assessment-header">
           <h1 className="heading-1">Employee Assessment</h1>
           <p className="body-large">
-            Personal evaluation for {navigation.employeeInfo.name} at {navigation.companyInfo.name}
+            Personal evaluation for Employee ID: {employeeId} at Company ID: {companyId}
           </p>
         </div>
 
@@ -328,7 +322,7 @@ const EmployeeAssessment: React.FC = () => {
             <div className="card-body">
               <ul>
                 {validationErrors.map((error, index) => {
-                  const question = state.questions.find(q => q.id === error.field);
+                  const question = questions.find(q => q.id === error.field);
                   return (
                     <li key={index}>
                       <strong>{question?.title || error.field}:</strong> {error.message}
@@ -346,7 +340,7 @@ const EmployeeAssessment: React.FC = () => {
             <div className="card-header">
               <div className="question-header">
                 <span className="question-number">
-                  Question {currentQuestionIndex + 1} of {state.questions.length}
+                  Question {currentQuestionIndex + 1} of {questions.length}
                 </span>
                 {currentQuestion.category && (
                   <span className="question-category">{currentQuestion.category}</span>
@@ -384,13 +378,13 @@ const EmployeeAssessment: React.FC = () => {
           </button>
 
           <div className="nav-info">
-            {currentQuestionIndex + 1} of {state.questions.length}
+            {currentQuestionIndex + 1} of {questions.length}
           </div>
 
           <button
             className="btn btn-outline"
             onClick={handleNextQuestion}
-            disabled={currentQuestionIndex === state.questions.length - 1}
+            disabled={currentQuestionIndex === questions.length - 1}
           >
             Next →
           </button>
@@ -415,7 +409,7 @@ const EmployeeAssessment: React.FC = () => {
           </button>
         </div>
 
-        {/* Employee Info Summary */}
+        {/* Assessment Info */}
         <div className="card info-card">
           <div className="card-header">
             <h3>Assessment Information</h3>
@@ -423,20 +417,12 @@ const EmployeeAssessment: React.FC = () => {
           <div className="card-body">
             <div className="info-grid">
               <div className="info-item">
-                <span className="info-label">Employee:</span>
-                <span className="info-value">{navigation.employeeInfo.name}</span>
+                <span className="info-label">Employee ID:</span>
+                <span className="info-value">{employeeId}</span>
               </div>
               <div className="info-item">
-                <span className="info-label">Role:</span>
-                <span className="info-value">{navigation.employeeInfo.role || 'Not specified'}</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">Department:</span>
-                <span className="info-value">{navigation.employeeInfo.department || 'Not specified'}</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">Company:</span>
-                <span className="info-value">{navigation.companyInfo.name}</span>
+                <span className="info-label">Company ID:</span>
+                <span className="info-value">{companyId}</span>
               </div>
               <div className="info-item">
                 <span className="info-label">Progress:</span>
