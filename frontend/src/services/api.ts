@@ -3,7 +3,7 @@
  * Handles all communication with AWS API Gateway and backend services
  */
 
-import { Question, QuestionSet, AssessmentResponse } from '../context/AssessmentContext';
+import { Question, ValidationError } from '../types';
 
 // API Configuration
 interface ApiConfig {
@@ -230,10 +230,10 @@ class APIServiceClass {
   /**
    * Get questions for assessment type
    */
-  async getQuestions(type: 'Company' | 'Employee'): Promise<QuestionSet> {
+  async getQuestions(type: 'Company' | 'Employee'): Promise<Question[]> {
     console.log(`📋 Fetching ${type} questions...`);
     
-    const response = await this.makeRequest<QuestionSet>(`/questions/${type}`);
+    const response = await this.makeRequest<{ questions: Question[] }>(`/questions/${type}`);
     
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to fetch questions');
@@ -245,7 +245,7 @@ class APIServiceClass {
     }
 
     console.log(`✅ Loaded ${response.data.questions.length} ${type} questions`);
-    return response.data;
+    return response.data.questions;
   }
 
   /**
@@ -285,6 +285,17 @@ class APIServiceClass {
 
     console.log('✅ Assessment response loaded successfully');
     return response.data;
+  }
+
+  /**
+   * Upload multiple files for assessment question
+   */
+  async uploadFiles(companyId: string, questionId: string, files: FileList): Promise<FileUploadResponse[]> {
+    const uploadPromises = Array.from(files).map(file => 
+      this.uploadFile({ companyId, questionId, file })
+    );
+    
+    return Promise.all(uploadPromises);
   }
 
   /**
@@ -361,6 +372,26 @@ class APIServiceClass {
 
 // Export singleton instance
 export const APIService = new APIServiceClass();
+
+// Export the main service instance as apiService for compatibility
+export const apiService = APIService;
+
+// Export factory function that components expect
+export const getApiService = () => APIService;
+
+// Export response handler utility that components expect
+export const handleApiResponse = async <T>(
+  apiCall: () => Promise<T>, 
+  options: { errorMessage?: string } = {}
+): Promise<T> => {
+  try {
+    return await apiCall();
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : (options.errorMessage || 'An error occurred');
+    console.error('API call failed:', errorMessage, error);
+    throw new Error(errorMessage);
+  }
+};
 
 // Export for direct use
 export default APIService;
