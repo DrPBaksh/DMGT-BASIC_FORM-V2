@@ -696,12 +696,13 @@ show_deployment_summary() {
         s3_website_url="Not available"
     fi
     
-    echo -e "${BOLD}${CYAN}🌐 Your Application URLs:${NC}"
-    echo -e "${GREEN}   🚀 PRIMARY ACCESS URL (CloudFront):${NC}"
-    echo -e "${BOLD}      $cloudfront_url${NC}"
+    echo -e "${BOLD}${GREEN}🌐 YOUR APPLICATION IS READY!${NC}"
     echo ""
-    echo -e "${BLUE}   🔄 FALLBACK URL (S3 Direct):${NC}"
-    echo "      $s3_website_url"
+    echo -e "${BOLD}${CYAN}✨ PRIMARY ACCESS URL (USE THIS ONE):${NC}"
+    echo -e "${BOLD}      🚀 $cloudfront_url${NC}"
+    echo ""
+    echo -e "${YELLOW}⚠️  IMPORTANT: Always use the CloudFront URL above, not the S3 bucket URL!${NC}"
+    echo -e "${YELLOW}   The S3 bucket URL will show Access Denied errors.${NC}"
     echo ""
     
     echo -e "${BOLD}${BLUE}🔗 API Endpoints:${NC}"
@@ -757,6 +758,8 @@ show_deployment_summary() {
     
     echo ""
     print_success "🎉 Your DMGT Assessment Form is now live and ready to use!"
+    echo ""
+    echo -e "${BOLD}${CYAN}🔗 Remember to bookmark this URL: $cloudfront_url${NC}"
     echo ""
 }
 
