@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'DMGT Data & AI Readiness Assessment Form - Enhanced Enterprise AWS Infrastructure (v2.1)'
+Description: 'DMGT Data & AI Readiness Assessment Form - Corrected Enterprise AWS Infrastructure (v2.2)'
 
 Parameters:
   Environment:
@@ -31,6 +31,7 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub '${BucketPrefix}-website-${AWS::AccountId}-${Environment}'
+      # CORRECTED: Allow bucket policy to apply while keeping bucket private via the policy itself
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: false
@@ -48,7 +49,7 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
-  # S3 Bucket Policy to allow CloudFront to access the website content
+  # S3 Bucket Policy to allow CloudFront to access the website content via OAC
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -72,9 +73,9 @@ Resources:
       BucketName: !Sub '${BucketPrefix}-config-${AWS::AccountId}-${Environment}'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
-        BlockPublicPolicy: false  # Allow bucket policies
+        BlockPublicPolicy: false
         IgnorePublicAcls: true
-        RestrictPublicBuckets: false  # Allow bucket policies
+        RestrictPublicBuckets: false
       CorsConfiguration:
         CorsRules:
           - AllowedHeaders: ['*']
@@ -151,12 +152,17 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
-  # CloudFront Origin Access Identity (OAI)
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+  # NEW: CloudFront Origin Access Control (OAC)
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
     Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub 'OAI for ${Environment} assessment form'
+      OriginAccessControlConfig:
+        Name: !Sub 'OAC-for-${WebsiteBucket}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # REMOVED: The old CloudFrontOAI resource is gone.
 
   # CloudFront Distribution for fast, secure content delivery
   CloudFrontDistribution:
@@ -171,8 +177,9 @@ Resources:
         Origins:
           - Id: S3WebsiteOrigin
             DomainName: !GetAtt WebsiteBucket.DomainName
-            S3OriginConfig:
-              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
+            # CORRECTED: Use OAC instead of OAI
+            OriginAccessControlId: !GetAtt CloudFrontOAC.Id
+            # The S3OriginConfig block has been removed
         DefaultCacheBehavior:
           TargetOriginId: S3WebsiteOrigin
           ViewerProtocolPolicy: redirect-to-https
@@ -185,7 +192,6 @@ Resources:
           MinTTL: 0
           DefaultTTL: 86400
           MaxTTL: 31536000
-        # Custom Error Response to handle client-side routing for the SPA
         CustomErrorResponses:
           - ErrorCode: 403
             ResponseCode: 200
@@ -219,7 +225,7 @@ Resources:
                   - !Sub 'arn:aws:s3:::${ResponsesBucket}/*'
                   - !Sub 'arn:aws:s3:::${FilesBucket}/*'
 
-  # Lambda Functions (Enhanced with proper timeouts)
+  # Lambda Functions (No changes needed here)
   GetQuestionsFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -244,59 +250,32 @@ Resources:
           
           def handler(event, context):
               try:
-                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
                       'Access-Control-Allow-Methods': '*',
                       'Access-Control-Allow-Credentials': 'true'
                   }
-                  
-                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
-                      return {
-                          'statusCode': 200,
-                          'headers': headers,
-                          'body': json.dumps({'message': 'CORS preflight'})
-                      }
+                      return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'message': 'CORS preflight'})}
                   
-                  # Get assessment type from path
                   assessment_type = event['pathParameters']['type']
                   if assessment_type not in ['Company', 'Employee']:
-                      return {
-                          'statusCode': 400,
-                          'headers': headers,
-                          'body': json.dumps({'error': 'Invalid assessment type'})
-                      }
+                      return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Invalid assessment type'})}
                   
                   bucket = os.environ['CONFIG_BUCKET']
                   key = f'config/{assessment_type}.json'
-                  
-                  # Get questions from S3
                   response = s3.get_object(Bucket=bucket, Key=key)
                   questions = json.loads(response['Body'].read())
                   
-                  return {
-                      'statusCode': 200,
-                      'headers': headers,
-                      'body': json.dumps(questions)
-                  }
-                  
+                  return {'statusCode': 200, 'headers': headers, 'body': json.dumps(questions)}
               except ClientError as e:
                   if e.response['Error']['Code'] == 'NoSuchKey':
-                      return {
-                          'statusCode': 404,
-                          'headers': headers,
-                          'body': json.dumps({'error': 'Questions not found'})
-                      }
+                      return {'statusCode': 404, 'headers': headers, 'body': json.dumps({'error': 'Questions not found'})}
                   raise
               except Exception as e:
                   print(f'Error: {str(e)}')
-                  return {
-                      'statusCode': 500,
-                      'headers': headers,
-                      'body': json.dumps({'error': 'Internal server error'})
-                  }
+                  return {'statusCode': 500, 'headers': headers, 'body': json.dumps({'error': 'Internal server error'})}
 
   SaveResponseFunction:
     Type: AWS::Lambda::Function
@@ -317,29 +296,20 @@ Resources:
           import boto3
           import os
           from datetime import datetime
-          from botocore.exceptions import ClientError
           
           s3 = boto3.client('s3')
           
           def handler(event, context):
               try:
-                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
                       'Access-Control-Allow-Methods': '*',
                       'Access-Control-Allow-Credentials': 'true'
                   }
-                  
-                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
-                      return {
-                          'statusCode': 200,
-                          'headers': headers,
-                          'body': json.dumps({'message': 'CORS preflight'})
-                      }
+                      return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'message': 'CORS preflight'})}
                   
-                  # Parse request body
                   body = json.loads(event['body'])
                   assessment_type = body.get('assessmentType')
                   company_id = body.get('companyId')
@@ -347,57 +317,27 @@ Resources:
                   responses = body.get('responses', {})
                   
                   if not assessment_type or not company_id:
-                      return {
-                          'statusCode': 400,
-                          'headers': headers,
-                          'body': json.dumps({'error': 'Missing required fields'})
-                      }
+                      return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Missing required fields'})}
                   
                   bucket = os.environ['RESPONSES_BUCKET']
                   
-                  # Determine S3 key based on assessment type
                   if assessment_type == 'Company':
                       key = f'company-responses/{company_id}.json'
                   else:
                       if not employee_id:
-                          return {
-                              'statusCode': 400,
-                              'headers': headers,
-                              'body': json.dumps({'error': 'Employee ID required for employee assessment'})
-                          }
+                          return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Employee ID required for employee assessment'})}
                       key = f'employee-responses/{company_id}/{employee_id}.json'
                   
-                  # Prepare response data
                   response_data = {
-                      'assessmentType': assessment_type,
-                      'companyId': company_id,
-                      'employeeId': employee_id,
-                      'responses': responses,
-                      'lastUpdated': datetime.utcnow().isoformat(),
-                      'version': '1.0'
+                      'assessmentType': assessment_type, 'companyId': company_id, 'employeeId': employee_id,
+                      'responses': responses, 'lastUpdated': datetime.utcnow().isoformat(), 'version': '1.0'
                   }
                   
-                  # Save to S3
-                  s3.put_object(
-                      Bucket=bucket,
-                      Key=key,
-                      Body=json.dumps(response_data, indent=2),
-                      ContentType='application/json'
-                  )
-                  
-                  return {
-                      'statusCode': 200,
-                      'headers': headers,
-                      'body': json.dumps({'message': 'Response saved successfully', 'key': key})
-                  }
-                  
+                  s3.put_object(Bucket=bucket, Key=key, Body=json.dumps(response_data, indent=2), ContentType='application/json')
+                  return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'message': 'Response saved successfully', 'key': key})}
               except Exception as e:
                   print(f'Error: {str(e)}')
-                  return {
-                      'statusCode': 500,
-                      'headers': headers,
-                      'body': json.dumps({'error': 'Internal server error'})
-                  }
+                  return {'statusCode': 500, 'headers': headers, 'body': json.dumps({'error': 'Internal server error'})}
 
   GetResponseFunction:
     Type: AWS::Lambda::Function
@@ -423,68 +363,39 @@ Resources:
           
           def handler(event, context):
               try:
-                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
                       'Access-Control-Allow-Methods': '*',
                       'Access-Control-Allow-Credentials': 'true'
                   }
-                  
-                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
-                      return {
-                          'statusCode': 200,
-                          'headers': headers,
-                          'body': json.dumps({'message': 'CORS preflight'})
-                      }
+                      return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'message': 'CORS preflight'})}
                   
-                  # Get parameters
                   assessment_type = event['pathParameters']['type']
                   company_id = event['pathParameters']['companyId']
                   employee_id = event['pathParameters'].get('employeeId')
-                  
                   bucket = os.environ['RESPONSES_BUCKET']
                   
-                  # Determine S3 key
                   if assessment_type == 'Company':
                       key = f'company-responses/{company_id}.json'
                   else:
                       if not employee_id:
-                          return {
-                              'statusCode': 400,
-                              'headers': headers,
-                              'body': json.dumps({'error': 'Employee ID required'})
-                          }
+                          return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Employee ID required'})}
                       key = f'employee-responses/{company_id}/{employee_id}.json'
                   
-                  # Get response from S3
                   response = s3.get_object(Bucket=bucket, Key=key)
                   response_data = json.loads(response['Body'].read())
                   
-                  return {
-                      'statusCode': 200,
-                      'headers': headers,
-                      'body': json.dumps(response_data)
-                  }
-                  
+                  return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response_data)}
               except ClientError as e:
                   if e.response['Error']['Code'] == 'NoSuchKey':
-                      return {
-                          'statusCode': 404,
-                          'headers': headers,
-                          'body': json.dumps({'error': 'Response not found'})
-                      }
+                      return {'statusCode': 404, 'headers': headers, 'body': json.dumps({'error': 'Response not found'})}
                   raise
               except Exception as e:
                   print(f'Error: {str(e)}')
-                  return {
-                      'statusCode': 500,
-                      'headers': headers,
-                      'body': json.dumps({'error': 'Internal server error'})
-                  }
+                  return {'statusCode': 500, 'headers': headers, 'body': json.dumps({'error': 'Internal server error'})}
 
-  # File Upload Function with extended timeout for large files (15 MINUTES)
   FileUploadFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -492,8 +403,8 @@ Resources:
       Handler: file_upload.handler
       Runtime: python3.11
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 900  # ✅ 15 minutes for large file uploads
-      MemorySize: 3008  # ✅ Maximum memory for better performance
+      Timeout: 900
+      MemorySize: 3008
       Environment:
         Variables:
           FILES_BUCKET: !Ref FilesBucket
@@ -506,100 +417,55 @@ Resources:
           import base64
           import uuid
           from datetime import datetime
-          from botocore.exceptions import ClientError
           
           s3 = boto3.client('s3')
           
           def handler(event, context):
               try:
-                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
                       'Access-Control-Allow-Methods': '*',
                       'Access-Control-Allow-Credentials': 'true'
                   }
-                  
-                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
-                      return {
-                          'statusCode': 200,
-                          'headers': headers,
-                          'body': json.dumps({'message': 'CORS preflight'})
-                      }
+                      return {'statusCode': 200, 'headers': headers, 'body': json.dumps({'message': 'CORS preflight'})}
                   
-                  # Parse request
                   body = json.loads(event['body'])
                   company_id = body.get('companyId')
                   question_id = body.get('questionId')
                   file_name = body.get('fileName')
-                  file_content = body.get('fileContent')  # base64 encoded
+                  file_content = body.get('fileContent')
                   content_type = body.get('contentType', 'application/octet-stream')
                   
                   if not all([company_id, question_id, file_name, file_content]):
-                      return {
-                          'statusCode': 400,
-                          'headers': headers,
-                          'body': json.dumps({'error': 'Missing required fields'})
-                      }
+                      return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Missing required fields'})}
                   
-                  # Decode file content
                   try:
                       file_data = base64.b64decode(file_content)
                   except Exception:
-                      return {
-                          'statusCode': 400,
-                          'headers': headers,
-                          'body': json.dumps({'error': 'Invalid file content encoding'})
-                      }
+                      return {'statusCode': 400, 'headers': headers, 'body': json.dumps({'error': 'Invalid file content encoding'})}
                   
                   bucket = os.environ['FILES_BUCKET']
-                  
-                  # Generate unique file key
                   timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
                   unique_id = str(uuid.uuid4())[:8]
                   safe_filename = file_name.replace(' ', '_').replace('/', '_')
                   key = f'company-files/{company_id}/{question_id}/{timestamp}_{unique_id}_{safe_filename}'
                   
-                  # Upload to S3
                   s3.put_object(
-                      Bucket=bucket,
-                      Key=key,
-                      Body=file_data,
-                      ContentType=content_type,
-                      Metadata={
-                          'original-filename': file_name,
-                          'upload-timestamp': datetime.utcnow().isoformat(),
-                          'company-id': company_id,
-                          'question-id': question_id
-                      }
+                      Bucket=bucket, Key=key, Body=file_data, ContentType=content_type,
+                      Metadata={'original-filename': file_name, 'upload-timestamp': datetime.utcnow().isoformat(),
+                                'company-id': company_id, 'question-id': question_id}
                   )
                   
-                  # Generate presigned URL for access
-                  download_url = s3.generate_presigned_url(
-                      'get_object',
-                      Params={'Bucket': bucket, 'Key': key},
-                      ExpiresIn=3600  # 1 hour
-                  )
+                  download_url = s3.generate_presigned_url('get_object', Params={'Bucket': bucket, 'Key': key}, ExpiresIn=3600)
                   
-                  return {
-                      'statusCode': 200,
-                      'headers': headers,
-                      'body': json.dumps({
-                          'message': 'File uploaded successfully',
-                          'fileKey': key,
-                          'downloadUrl': download_url,
-                          'fileName': file_name
-                      })
-                  }
-                  
+                  return {'statusCode': 200, 'headers': headers, 'body': json.dumps({
+                      'message': 'File uploaded successfully', 'fileKey': key, 'downloadUrl': download_url, 'fileName': file_name
+                  })}
               except Exception as e:
                   print(f'Error: {str(e)}')
-                  return {
-                      'statusCode': 500,
-                      'headers': headers,
-                      'body': json.dumps({'error': 'Internal server error'})
-                  }
+                  return {'statusCode': 500, 'headers': headers, 'body': json.dumps({'error': 'Internal server error'})}
 
   # API Gateway with proper CORS
   RestApi:
@@ -612,7 +478,7 @@ Resources:
       BinaryMediaTypes:
         - '*/*'
 
-  # API Gateway Resources and Methods with CORS enabled
+  # API Gateway Resources and Methods
   QuestionsResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -843,9 +709,7 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*'
 
-# ✅ COMPREHENSIVE OUTPUTS FOR DYNAMIC .ENV GENERATION
 Outputs:
-  # Enhanced outputs for comprehensive .env generation
   WebsiteBucket:
     Description: Name of the S3 bucket for the website
     Value: !Ref WebsiteBucket
@@ -900,7 +764,6 @@ Outputs:
     Export:
       Name: !Sub '${Environment}-ApiGatewayUrl'
       
-  # Additional outputs for comprehensive configuration
   GetQuestionsApiUrl:
     Description: API endpoint for getting questions
     Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/questions'
