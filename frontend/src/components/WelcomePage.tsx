@@ -1,586 +1,396 @@
-/**
- * Enhanced WelcomePage Component for DMGT Basic Form V2
- * Premium design with amazing UX, comprehensive form handling, and configuration integration
- */
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { config, isDevelopment } from '../services/config';
-import { getApiService } from '../services/api';
 import './WelcomePage.css';
+import { useAssessment } from '../context/AssessmentContext';
+import { APIService } from '../services/api';
 
-interface FormData {
-  assessmentType: 'Company' | 'Employee' | '';
-  companyId: string;
-  companyName: string;
-  employeeId: string;
-  employeeName: string;
-  email: string;
-  department: string;
-  role: string;
+interface FeatureCard {
+  icon: string;
+  title: string;
+  description: string;
+  highlight?: boolean;
 }
 
-interface FormErrors {
-  [key: string]: string;
-}
-
-interface ApiHealthStatus {
-  healthy: boolean;
-  responseTime?: number;
-  lastChecked?: string;
+interface AssessmentOption {
+  type: 'Company' | 'Employee';
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  color: string;
+  features: string[];
+  estimatedTime: string;
 }
 
 const WelcomePage: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState<FormData>({
-    assessmentType: '',
-    companyId: '',
-    companyName: '',
-    employeeId: '',
-    employeeName: '',
-    email: '',
-    department: '',
-    role: ''
-  });
-  
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [apiHealth, setApiHealth] = useState<ApiHealthStatus>({ healthy: true });
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const { state, loadQuestions } = useAssessment();
+  const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [companyId, setCompanyId] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [showEmployeeId, setShowEmployeeId] = useState(false);
 
-  // Get app configuration
-  const appConfig = config.getConfig();
-  const appMetadata = config.getAppMetadata();
-
-  /**
-   * API health check on component mount
-   */
+  // Check API status on component mount
   useEffect(() => {
-    const checkApiHealth = async () => {
+    const checkApiStatus = async () => {
       try {
-        const apiService = getApiService();
-        const healthResult = await apiService.checkHealth();
-        setApiHealth({
-          healthy: healthResult.healthy,
-          responseTime: healthResult.details?.responseTime,
-          lastChecked: new Date().toISOString()
-        });
+        const isHealthy = await APIService.healthCheck();
+        setApiStatus(isHealthy ? 'online' : 'offline');
       } catch (error) {
-        console.warn('API health check failed:', error);
-        setApiHealth({ 
-          healthy: false, 
-          lastChecked: new Date().toISOString() 
-        });
+        console.error('API health check failed:', error);
+        setApiStatus('offline');
       }
     };
 
-    checkApiHealth();
+    checkApiStatus();
   }, []);
 
-  /**
-   * Form validation with comprehensive checks
-   */
-  const validateForm = useMemo(() => {
-    return (data: FormData): FormErrors => {
-      const newErrors: FormErrors = {};
-
-      // Assessment type validation
-      if (!data.assessmentType) {
-        newErrors.assessmentType = 'Please select an assessment type';
-      }
-
-      // Company information validation
-      if (!data.companyId.trim()) {
-        newErrors.companyId = 'Company ID is required';
-      } else if (data.companyId.length < 2) {
-        newErrors.companyId = 'Company ID must be at least 2 characters';
-      } else if (!/^[a-zA-Z0-9_-]+$/.test(data.companyId)) {
-        newErrors.companyId = 'Company ID can only contain letters, numbers, hyphens, and underscores';
-      }
-
-      if (!data.companyName.trim()) {
-        newErrors.companyName = 'Company name is required';
-      } else if (data.companyName.length < 2) {
-        newErrors.companyName = 'Company name must be at least 2 characters';
-      }
-
-      // Employee-specific validation
-      if (data.assessmentType === 'Employee') {
-        if (!data.employeeId.trim()) {
-          newErrors.employeeId = 'Employee ID is required for employee assessments';
-        } else if (data.employeeId.length < 2) {
-          newErrors.employeeId = 'Employee ID must be at least 2 characters';
-        } else if (!/^[a-zA-Z0-9_-]+$/.test(data.employeeId)) {
-          newErrors.employeeId = 'Employee ID can only contain letters, numbers, hyphens, and underscores';
-        }
-
-        if (!data.employeeName.trim()) {
-          newErrors.employeeName = 'Employee name is required for employee assessments';
-        } else if (data.employeeName.length < 2) {
-          newErrors.employeeName = 'Employee name must be at least 2 characters';
-        }
-
-        if (!data.email.trim()) {
-          newErrors.email = 'Email is required for employee assessments';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-          newErrors.email = 'Please enter a valid email address';
-        }
-
-        if (!data.department.trim()) {
-          newErrors.department = 'Department is required for employee assessments';
-        }
-
-        if (!data.role.trim()) {
-          newErrors.role = 'Role is required for employee assessments';
-        }
-      }
-
-      return newErrors;
-    };
-  }, []);
-
-  /**
-   * Handle form field changes with real-time validation
-   */
-  const handleInputChange = (field: keyof FormData) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const value = event.target.value;
-    
-    setFormData(prev => {
-      const updated = { ...prev, [field]: value };
-      
-      // Clear related errors when user starts typing
-      const newErrors = { ...errors };
-      delete newErrors[field];
-      
-      // Special handling for assessment type change
-      if (field === 'assessmentType' && value !== prev.assessmentType) {
-        // Clear employee-specific fields if switching to company assessment
-        if (value === 'Company') {
-          updated.employeeId = '';
-          updated.employeeName = '';
-          updated.email = '';
-          updated.department = '';
-          updated.role = '';
-          
-          // Clear employee-specific errors
-          delete newErrors.employeeId;
-          delete newErrors.employeeName;
-          delete newErrors.email;
-          delete newErrors.department;
-          delete newErrors.role;
-        }
-      }
-      
-      setErrors(newErrors);
-      return updated;
-    });
-  };
-
-  /**
-   * Generate smart suggestions for company/employee IDs
-   */
-  const generateSuggestions = (type: 'company' | 'employee') => {
-    const timestamp = Date.now().toString(36);
-    const random = Math.random().toString(36).substr(2, 4);
-    
-    if (type === 'company') {
-      const baseName = formData.companyName.toLowerCase().replace(/[^a-z0-9]/g, '').substr(0, 8);
-      return baseName ? `${baseName}-${timestamp}` : `company-${timestamp}`;
-    } else {
-      const baseName = formData.employeeName.toLowerCase().replace(/[^a-z0-9]/g, '').substr(0, 6);
-      return baseName ? `${baseName}-${random}` : `emp-${random}`;
+  // Preload questions for both assessment types
+  useEffect(() => {
+    if (apiStatus === 'online') {
+      loadQuestions('Company').catch(console.error);
+      loadQuestions('Employee').catch(console.error);
     }
-  };
+  }, [apiStatus, loadQuestions]);
 
-  /**
-   * Handle form submission with comprehensive validation
-   */
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    
-    // Validate form
-    const formErrors = validateForm(formData);
-    
-    if (Object.keys(formErrors).length > 0) {
-      setErrors(formErrors);
-      
-      // Focus on first error field
-      const firstErrorField = Object.keys(formErrors)[0];
-      const fieldElement = document.querySelector(`[name="${firstErrorField}"]`) as HTMLElement;
-      fieldElement?.focus();
-      
+  const features: FeatureCard[] = [
+    {
+      icon: '🎯',
+      title: 'Comprehensive Assessment',
+      description: 'Evaluate your organization\'s data and AI readiness across multiple dimensions',
+      highlight: true
+    },
+    {
+      icon: '📊',
+      title: 'Real-time Analytics',
+      description: 'Get instant insights and progress tracking throughout the assessment process'
+    },
+    {
+      icon: '🔒',
+      title: 'Enterprise Security',
+      description: 'Bank-grade security with encrypted data transmission and secure cloud storage'
+    },
+    {
+      icon: '📱',
+      title: 'Multi-device Support',
+      description: 'Access your assessments from any device with automatic sync and save'
+    },
+    {
+      icon: '🔄',
+      title: 'Auto-save Technology',
+      description: 'Never lose your progress with intelligent auto-save every 30 seconds'
+    },
+    {
+      icon: '📈',
+      title: 'Detailed Reporting',
+      description: 'Comprehensive reports with actionable recommendations and benchmarks'
+    }
+  ];
+
+  const assessmentOptions: AssessmentOption[] = [
+    {
+      type: 'Company',
+      title: 'Company Assessment',
+      subtitle: 'Organizational Readiness',
+      description: 'Comprehensive evaluation of your organization\'s data infrastructure, AI capabilities, and digital transformation readiness.',
+      icon: '🏢',
+      color: 'blue',
+      features: [
+        'Data Infrastructure Analysis',
+        'AI/ML Capability Assessment',
+        'Digital Transformation Roadmap',
+        'Governance & Compliance Review',
+        'Technology Stack Evaluation',
+        'Strategic Recommendations'
+      ],
+      estimatedTime: '45-60 minutes'
+    },
+    {
+      type: 'Employee',
+      title: 'Employee Assessment',
+      subtitle: 'Individual Skills & Knowledge',
+      description: 'Evaluate individual employee skills, knowledge gaps, and training needs in data science and AI technologies.',
+      icon: '👤',
+      color: 'green',
+      features: [
+        'Technical Skills Assessment',
+        'Data Literacy Evaluation',
+        'AI/ML Knowledge Testing',
+        'Tool Proficiency Check',
+        'Learning Path Recommendations',
+        'Certification Roadmap'
+      ],
+      estimatedTime: '30-45 minutes'
+    }
+  ];
+
+  const handleStartAssessment = (type: 'Company' | 'Employee') => {
+    if (!companyId.trim()) {
+      alert('Please enter a Company ID to begin the assessment.');
       return;
     }
 
-    setIsLoading(true);
-    setErrors({});
+    if (type === 'Employee' && !employeeId.trim()) {
+      alert('Please enter an Employee ID for the employee assessment.');
+      return;
+    }
 
-    try {
-      // Check API health before proceeding
-      if (!apiHealth.healthy && !isDevelopment()) {
-        throw new Error('API service is currently unavailable. Please try again later.');
-      }
-
-      // Simulate loading for better UX
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Navigate to appropriate assessment
-      if (formData.assessmentType === 'Company') {
-        navigate(`/company/${formData.companyId}`, {
-          state: {
-            companyName: formData.companyName,
-            companyId: formData.companyId
-          }
-        });
-      } else {
-        navigate(`/employee/${formData.companyId}/${formData.employeeId}`, {
-          state: {
-            companyName: formData.companyName,
-            companyId: formData.companyId,
-            employeeName: formData.employeeName,
-            employeeId: formData.employeeId,
-            email: formData.email,
-            department: formData.department,
-            role: formData.role
-          }
-        });
-      }
-      
-    } catch (error) {
-      console.error('Form submission error:', error);
-      setErrors({
-        submit: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.'
-      });
-    } finally {
-      setIsLoading(false);
+    // Navigate to the appropriate assessment
+    if (type === 'Company') {
+      navigate(`/company/${encodeURIComponent(companyId.trim())}`);
+    } else {
+      navigate(`/employee/${encodeURIComponent(companyId.trim())}/${encodeURIComponent(employeeId.trim())}`);
     }
   };
 
-  /**
-   * Input field component with enhanced styling
-   */
-  const InputField: React.FC<{
-    name: keyof FormData;
-    label: string;
-    type?: string;
-    placeholder?: string;
-    required?: boolean;
-    showSuggestion?: boolean;
-    suggestionType?: 'company' | 'employee';
-  }> = ({ name, label, type = 'text', placeholder, required, showSuggestion, suggestionType }) => (
-    <div className="form-group">
-      <label htmlFor={name} className="form-label">
-        {label}
-        {required && <span className="required">*</span>}
-      </label>
-      <div className="input-wrapper">
-        <input
-          id={name}
-          name={name}
-          type={type}
-          value={formData[name]}
-          onChange={handleInputChange(name)}
-          placeholder={placeholder}
-          className={`form-input ${errors[name] ? 'error' : ''}`}
-          aria-describedby={errors[name] ? `${name}-error` : undefined}
-        />
-        {showSuggestion && suggestionType && (
-          <button
-            type="button"
-            className="suggestion-button"
-            onClick={() => {
-              const suggestion = generateSuggestions(suggestionType);
-              setFormData(prev => ({ ...prev, [name]: suggestion }));
-              setErrors(prev => ({ ...prev, [name]: '' }));
-            }}
-            title="Generate suggestion"
-          >
-            ✨
-          </button>
-        )}
-      </div>
-      {errors[name] && (
-        <div id={`${name}-error`} className="form-error" role="alert">
-          {errors[name]}
-        </div>
-      )}
-    </div>
-  );
+  const getApiStatusDisplay = () => {
+    switch (apiStatus) {
+      case 'checking':
+        return <span className="status-checking">🔄 Checking connection...</span>;
+      case 'online':
+        return <span className="status-online">🟢 All systems operational</span>;
+      case 'offline':
+        return <span className="status-offline">🔴 Service temporarily unavailable</span>;
+    }
+  };
 
   return (
     <div className="welcome-page">
       {/* Hero Section */}
-      <div className="hero-section">
+      <section className="hero-section">
         <div className="hero-content">
-          <div className="hero-badge">
-            <span className="badge-text">Enterprise Assessment Platform</span>
-            <span className="badge-version">v{appMetadata.version}</span>
-          </div>
-          
-          <h1 className="hero-title">
-            {appConfig.appName}
-          </h1>
-          
-          <p className="hero-description">
-            Comprehensive evaluation tool for organizational data and AI readiness. 
-            Choose your assessment type to begin your journey toward digital transformation excellence.
-          </p>
-
-          {/* API Health Indicator */}
-          <div className={`api-status ${apiHealth.healthy ? 'healthy' : 'unhealthy'}`}>
-            <div className="status-indicator">
-              <div className="status-dot"></div>
-              <span className="status-text">
-                {apiHealth.healthy ? 'Systems Operational' : 'Limited Connectivity'}
-              </span>
-              {apiHealth.responseTime && (
-                <span className="response-time">({apiHealth.responseTime}ms)</span>
-              )}
+          <div className="hero-text">
+            <h1 className="hero-title">
+              DMGT Assessment Platform
+              <span className="hero-subtitle">Data & AI Readiness Evaluation</span>
+            </h1>
+            <p className="hero-description">
+              Transform your organization with comprehensive assessments that evaluate data maturity, 
+              AI capabilities, and digital readiness. Get actionable insights to drive your 
+              transformation journey forward.
+            </p>
+            <div className="hero-stats">
+              <div className="stat">
+                <span className="stat-number">50+</span>
+                <span className="stat-label">Assessment Categories</span>
+              </div>
+              <div className="stat">
+                <span className="stat-number">15min</span>
+                <span className="stat-label">Auto-save Intervals</span>
+              </div>
+              <div className="stat">
+                <span className="stat-number">100%</span>
+                <span className="stat-label">Secure & Encrypted</span>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Assessment Selection */}
-      <div className="assessment-section">
-        <div className="section-header">
-          <h2>Choose Your Assessment Type</h2>
-          <p>Select the assessment that best matches your needs</p>
-        </div>
-
-        <div className="assessment-options">
-          <div 
-            className={`assessment-card ${formData.assessmentType === 'Company' ? 'selected' : ''}`}
-            onClick={() => handleInputChange('assessmentType')({ target: { value: 'Company' } } as any)}
-          >
-            <div className="card-icon">🏢</div>
-            <h3>Company Assessment</h3>
-            <p>Evaluate your organization's overall data and AI readiness across all departments and systems.</p>
-            <ul className="features-list">
-              <li>Enterprise-wide evaluation</li>
-              <li>Strategic readiness analysis</li>
-              <li>Infrastructure assessment</li>
-              <li>Governance framework review</li>
-            </ul>
-            <div className="card-footer">
-              <span className="duration">⏱️ 15-20 minutes</span>
-              <span className="audience">👥 Leadership team</span>
-            </div>
-          </div>
-
-          <div 
-            className={`assessment-card ${formData.assessmentType === 'Employee' ? 'selected' : ''}`}
-            onClick={() => handleInputChange('assessmentType')({ target: { value: 'Employee' } } as any)}
-          >
-            <div className="card-icon">👤</div>
-            <h3>Employee Assessment</h3>
-            <p>Assess individual skills, knowledge, and experience with data and AI technologies.</p>
-            <ul className="features-list">
-              <li>Personal skill evaluation</li>
-              <li>Role-specific questions</li>
-              <li>Training needs identification</li>
-              <li>Career development insights</li>
-            </ul>
-            <div className="card-footer">
-              <span className="duration">⏱️ 10-15 minutes</span>
-              <span className="audience">👤 Individual contributors</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Form Section */}
-      {formData.assessmentType && (
-        <div className="form-section">
-          <div className="form-container">
-            <div className="form-header">
-              <h2>
-                {formData.assessmentType === 'Company' ? '🏢 Company Information' : '👤 Participant Information'}
-              </h2>
-              <p>Please provide the required information to begin your assessment</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="assessment-form" noValidate>
-              {/* Company Information */}
-              <div className="form-section-group">
-                <h3>Company Details</h3>
-                
-                <div className="form-row">
-                  <InputField
-                    name="companyName"
-                    label="Company Name"
-                    placeholder="Enter your company name"
-                    required
-                  />
-                  <InputField
-                    name="companyId"
-                    label="Company ID"
-                    placeholder="Unique identifier for your company"
-                    required
-                    showSuggestion
-                    suggestionType="company"
-                  />
+          <div className="hero-visual">
+            <div className="assessment-preview">
+              <div className="preview-header">
+                <div className="preview-dots">
+                  <span></span><span></span><span></span>
+                </div>
+                <div className="preview-title">Assessment Dashboard</div>
+              </div>
+              <div className="preview-content">
+                <div className="preview-chart">
+                  <div className="chart-bar" style={{ height: '60%' }}></div>
+                  <div className="chart-bar" style={{ height: '80%' }}></div>
+                  <div className="chart-bar" style={{ height: '45%' }}></div>
+                  <div className="chart-bar" style={{ height: '90%' }}></div>
+                </div>
+                <div className="preview-metrics">
+                  <div className="metric">
+                    <span className="metric-label">Progress</span>
+                    <span className="metric-value">87%</span>
+                  </div>
+                  <div className="metric">
+                    <span className="metric-label">Score</span>
+                    <span className="metric-value">A+</span>
+                  </div>
                 </div>
               </div>
-
-              {/* Employee Information (if Employee assessment) */}
-              {formData.assessmentType === 'Employee' && (
-                <div className="form-section-group">
-                  <h3>Employee Details</h3>
-                  
-                  <div className="form-row">
-                    <InputField
-                      name="employeeName"
-                      label="Full Name"
-                      placeholder="Enter your full name"
-                      required
-                    />
-                    <InputField
-                      name="employeeId"
-                      label="Employee ID"
-                      placeholder="Unique employee identifier"
-                      required
-                      showSuggestion
-                      suggestionType="employee"
-                    />
-                  </div>
-
-                  <div className="form-row">
-                    <InputField
-                      name="email"
-                      label="Email Address"
-                      type="email"
-                      placeholder="your.email@company.com"
-                      required
-                    />
-                    <InputField
-                      name="department"
-                      label="Department"
-                      placeholder="e.g., Engineering, Marketing, Sales"
-                      required
-                    />
-                  </div>
-
-                  <InputField
-                    name="role"
-                    label="Job Title/Role"
-                    placeholder="e.g., Software Engineer, Data Analyst, Manager"
-                    required
-                  />
-                </div>
-              )}
-
-              {/* Advanced Options */}
-              <div className="advanced-section">
-                <button
-                  type="button"
-                  className="advanced-toggle"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                >
-                  <span>Advanced Options</span>
-                  <span className={`toggle-icon ${showAdvanced ? 'expanded' : ''}`}>▼</span>
-                </button>
-
-                {showAdvanced && (
-                  <div className="advanced-content">
-                    <div className="info-box">
-                      <h4>Configuration Information</h4>
-                      <div className="config-grid">
-                        <div className="config-item">
-                          <span className="config-label">Environment:</span>
-                          <span className="config-value">{appConfig.environment}</span>
-                        </div>
-                        <div className="config-item">
-                          <span className="config-label">Region:</span>
-                          <span className="config-value">{config.getAwsConfig().region}</span>
-                        </div>
-                        <div className="config-item">
-                          <span className="config-label">API Status:</span>
-                          <span className={`config-value ${apiHealth.healthy ? 'healthy' : 'error'}`}>
-                            {apiHealth.healthy ? 'Connected' : 'Disconnected'}
-                          </span>
-                        </div>
-                        <div className="config-item">
-                          <span className="config-label">Version:</span>
-                          <span className="config-value">{appMetadata.version}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Form Errors */}
-              {errors.submit && (
-                <div className="form-error-banner" role="alert">
-                  <div className="error-icon">⚠️</div>
-                  <div className="error-content">
-                    <strong>Submission Error</strong>
-                    <p>{errors.submit}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="form-actions">
-                <button
-                  type="submit"
-                  className={`btn btn-primary btn-lg ${isLoading ? 'loading' : ''}`}
-                  disabled={isLoading || !formData.assessmentType}
-                >
-                  {isLoading ? (
-                    <>
-                      <span className="loading-spinner"></span>
-                      <span>Preparing Assessment...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Begin Assessment</span>
-                      <span className="submit-icon">→</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
-      )}
+      </section>
+
+      {/* System Status */}
+      <section className="status-section">
+        <div className="status-container">
+          <div className="status-info">
+            <span className="status-label">System Status:</span>
+            {getApiStatusDisplay()}
+          </div>
+          <div className="config-info">
+            <span className="config-label">Environment:</span>
+            <span className={`env-badge env-${state.config.environment}`}>
+              {state.config.environment.toUpperCase()}
+            </span>
+          </div>
+        </div>
+      </section>
 
       {/* Features Section */}
-      <div className="features-section">
+      <section className="features-section">
         <div className="section-header">
-          <h2>Why Choose Our Assessment Platform?</h2>
-          <p>Enterprise-grade features designed for comprehensive evaluation</p>
+          <h2>Why Choose DMGT Assessment Platform?</h2>
+          <p>Built for enterprise organizations seeking comprehensive data and AI readiness evaluation</p>
         </div>
-
         <div className="features-grid">
-          <div className="feature-card">
-            <div className="feature-icon">🔒</div>
-            <h3>Secure & Private</h3>
-            <p>Enterprise-grade security with encrypted data transmission and secure cloud storage.</p>
+          {features.map((feature, index) => (
+            <div key={index} className={`feature-card ${feature.highlight ? 'featured' : ''}`}>
+              <div className="feature-icon">{feature.icon}</div>
+              <h3 className="feature-title">{feature.title}</h3>
+              <p className="feature-description">{feature.description}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Assessment Options */}
+      <section className="assessments-section">
+        <div className="section-header">
+          <h2>Start Your Assessment Journey</h2>
+          <p>Choose the assessment type that best fits your evaluation needs</p>
+        </div>
+
+        {/* ID Input Section */}
+        <div className="id-input-section">
+          <div className="input-group">
+            <label htmlFor="companyId" className="input-label">
+              <span className="label-text">Company ID</span>
+              <span className="label-required">*</span>
+            </label>
+            <input
+              id="companyId"
+              type="text"
+              value={companyId}
+              onChange={(e) => setCompanyId(e.target.value)}
+              className="id-input"
+              placeholder="Enter your company identifier (e.g., DMGT-2025)"
+              maxLength={50}
+              required
+            />
+          </div>
+          
+          <div className="employee-toggle">
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={showEmployeeId}
+                onChange={(e) => setShowEmployeeId(e.target.checked)}
+                className="toggle-input"
+              />
+              <span className="toggle-text">I need to enter an Employee ID for individual assessment</span>
+            </label>
           </div>
 
-          <div className="feature-card">
-            <div className="feature-icon">📊</div>
-            <h3>Comprehensive Analysis</h3>
-            <p>In-depth evaluation covering all aspects of data and AI readiness across your organization.</p>
-          </div>
+          {showEmployeeId && (
+            <div className="input-group">
+              <label htmlFor="employeeId" className="input-label">
+                <span className="label-text">Employee ID</span>
+                <span className="label-required">*</span>
+              </label>
+              <input
+                id="employeeId"
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                className="id-input"
+                placeholder="Enter employee identifier (e.g., EMP-001)"
+                maxLength={50}
+              />
+            </div>
+          )}
+        </div>
 
-          <div className="feature-card">
-            <div className="feature-icon">⚡</div>
-            <h3>Fast & Efficient</h3>
-            <p>Streamlined assessment process with intelligent question routing and auto-save functionality.</p>
-          </div>
+        {/* Assessment Cards */}
+        <div className="assessments-grid">
+          {assessmentOptions.map((option) => (
+            <div key={option.type} className={`assessment-card assessment-${option.color}`}>
+              <div className="assessment-header">
+                <div className="assessment-icon">{option.icon}</div>
+                <div className="assessment-titles">
+                  <h3 className="assessment-title">{option.title}</h3>
+                  <p className="assessment-subtitle">{option.subtitle}</p>
+                </div>
+              </div>
+              
+              <p className="assessment-description">{option.description}</p>
+              
+              <div className="assessment-features">
+                <h4>What's Included:</h4>
+                <ul>
+                  {option.features.map((feature, index) => (
+                    <li key={index}>{feature}</li>
+                  ))}
+                </ul>
+              </div>
+              
+              <div className="assessment-meta">
+                <div className="time-estimate">
+                  <span className="time-icon">⏱️</span>
+                  <span>Estimated time: {option.estimatedTime}</span>
+                </div>
+              </div>
+              
+              <button
+                onClick={() => handleStartAssessment(option.type)}
+                disabled={apiStatus !== 'online' || !companyId.trim() || (option.type === 'Employee' && showEmployeeId && !employeeId.trim())}
+                className={`assessment-button assessment-button-${option.color}`}
+              >
+                {state.loading.questions ? (
+                  <>
+                    <span className="button-spinner">⏳</span>
+                    Loading Questions...
+                  </>
+                ) : (
+                  <>
+                    <span>Start {option.title}</span>
+                    <span className="button-arrow">→</span>
+                  </>
+                )}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="feature-card">
-            <div className="feature-icon">📈</div>
-            <h3>Actionable Insights</h3>
-            <p>Detailed reports with specific recommendations for improving your data and AI capabilities.</p>
+      {/* Info Section */}
+      <section className="info-section">
+        <div className="info-grid">
+          <div className="info-card">
+            <h3>📋 Before You Begin</h3>
+            <ul>
+              <li>Ensure you have administrative access to relevant systems</li>
+              <li>Gather information about your current data infrastructure</li>
+              <li>Set aside dedicated time for uninterrupted assessment</li>
+              <li>Have relevant documentation and metrics available</li>
+            </ul>
+          </div>
+          
+          <div className="info-card">
+            <h3>💾 Auto-save & Security</h3>
+            <ul>
+              <li>Your progress is automatically saved every 30 seconds</li>
+              <li>All data is encrypted in transit and at rest</li>
+              <li>You can pause and resume assessments at any time</li>
+              <li>No sensitive data is stored in browser memory</li>
+            </ul>
+          </div>
+          
+          <div className="info-card">
+            <h3>📞 Support & Help</h3>
+            <ul>
+              <li>Technical support available during business hours</li>
+              <li>Comprehensive help documentation included</li>
+              <li>Real-time guidance throughout the assessment</li>
+              <li>Export capabilities for further analysis</li>
+            </ul>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
