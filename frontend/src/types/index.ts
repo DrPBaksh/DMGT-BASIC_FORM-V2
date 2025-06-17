@@ -12,6 +12,11 @@ export interface Question {
   fileUpload?: FileUploadConfig;
   conditional?: ConditionalLogic;
   section?: string;
+  placeholder?: string;
+  rows?: number;
+  accept?: string;
+  multiple?: boolean;
+  maxSize?: number;
 }
 
 export type QuestionType = 
@@ -24,7 +29,8 @@ export type QuestionType =
   | 'rating' 
   | 'number' 
   | 'email' 
-  | 'url';
+  | 'url'
+  | 'scale';
 
 export interface QuestionValidation {
   minLength?: number;
@@ -61,6 +67,28 @@ export interface FileUpload {
   uploadDate: string;
   fileSize: number;
   contentType: string;
+}
+
+// New interfaces for form components
+export interface ValidationError {
+  field: string;
+  message: string;
+  code?: string;
+}
+
+export interface UploadedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  url?: string;
+  uploadDate?: string;
+}
+
+export interface ProgressData {
+  completed: number;
+  total: number;
+  percentage: number;
 }
 
 export interface AssessmentData {
@@ -125,6 +153,10 @@ export interface CompanyInfo {
   industry?: string;
   size?: string;
   region?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  description?: string;
 }
 
 export interface EmployeeInfo {
@@ -134,6 +166,8 @@ export interface EmployeeInfo {
   role?: string;
   department?: string;
   companyId: string;
+  experience?: string;
+  skills?: string[];
 }
 
 export interface NavigationState {
@@ -255,13 +289,6 @@ export class AssessmentError extends Error {
   ) {
     super(message);
     this.name = 'AssessmentError';
-  }
-}
-
-export class ValidationError extends AssessmentError {
-  constructor(message: string, public field?: string) {
-    super(message, 'VALIDATION_ERROR');
-    this.name = 'ValidationError';
   }
 }
 
