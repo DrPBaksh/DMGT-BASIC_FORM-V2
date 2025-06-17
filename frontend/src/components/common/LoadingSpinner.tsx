@@ -33,9 +33,9 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   return (
     <div className={containerClasses}>
-      <div className=\"loading-content\">
+      <div className="loading-content">
         <div className={spinnerClasses}>
-          <div className=\"spinner-ring\">
+          <div className="spinner-ring">
             <div></div>
             <div></div>
             <div></div>
@@ -43,7 +43,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
           </div>
         </div>
         {message && (
-          <p className=\"loading-message\">{message}</p>
+          <p className="loading-message">{message}</p>
         )}
       </div>
     </div>
