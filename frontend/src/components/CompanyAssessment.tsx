@@ -5,9 +5,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
-import { config } from '../services/config';
 import { getApiService, handleApiResponse } from '../services/api';
-import { Question, AssessmentData, ValidationError } from '../types';
+import { Question, AssessmentData, ValidationError, ProgressInfo } from '../types';
+import config from '../services/config';
 import LoadingSpinner from './common/LoadingSpinner';
 import QuestionRenderer from './forms/QuestionRenderer';
 import ProgressBar from './forms/ProgressBar';
@@ -46,7 +46,7 @@ const CompanyAssessment: React.FC = () => {
   /**
    * Calculate completion progress
    */
-  const calculateProgress = useCallback(() => {
+  const calculateProgress = useCallback((): ProgressInfo => {
     if (questions.length === 0) return { completed: 0, total: 0, percentage: 0 };
     
     const answeredQuestions = questions.filter(question => {
