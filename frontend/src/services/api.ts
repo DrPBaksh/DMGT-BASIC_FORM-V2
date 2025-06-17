@@ -1,610 +1,380 @@
-// Enhanced DMGT Assessment Form - API Service Layer
-// Professional, enterprise-grade API communication with comprehensive error handling
-// Integrated with dynamic configuration service
+/**
+ * API Service for DMGT Assessment Platform
+ * Handles all communication with AWS API Gateway and backend services
+ */
 
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { config } from './config';
-import { 
-  Question, 
-  AssessmentData, 
-  SaveRequest, 
-  ApiResponse, 
-  FileUpload,
-  NetworkError,
-  ValidationError,
-  FileUploadError
-} from '../types';
+import { Question, QuestionSet, AssessmentResponse } from '../context/AssessmentContext';
 
-class ApiService {
-  private api: AxiosInstance;
-  private baseURL: string;
-  private config: ReturnType<typeof config.getApiConfig>;
+// API Configuration
+interface ApiConfig {
+  baseUrl: string;
+  timeout: number;
+  retryAttempts: number;
+  retryDelay: number;
+}
 
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-    this.config = config.getApiConfig();
-    
-    // Create axios instance with dynamic configuration
-    this.api = axios.create({
-      baseURL,
-      timeout: this.config.timeout,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-App-Version': config.getConfig().appVersion,
-        'X-Environment': config.getConfig().environment,
-      },
-    });
+// Request/Response Types
+interface ApiResponse<T = any> {
+  data?: T;
+  error?: string;
+  success: boolean;
+  timestamp: string;
+}
 
-    // Request interceptor with enhanced logging
-    this.api.interceptors.request.use(
-      (requestConfig) => {
-        // Add timestamp to prevent caching
-        if (requestConfig.method === 'get') {
-          requestConfig.params = {
-            ...requestConfig.params,
-            _t: Date.now()
-          };
-        }
-        
-        // Add request ID for tracking
-        const requestId = Math.random().toString(36).substr(2, 9);
-        requestConfig.headers['X-Request-ID'] = requestId;
-        
-        if (config.isDev()) {
-          console.log(`🔄 API Request [${requestId}]:`, {
-            method: requestConfig.method?.toUpperCase(),
-            url: requestConfig.url,
-            timeout: requestConfig.timeout,
-            headers: requestConfig.headers
-          });
-        }
-        
-        return requestConfig;
-      },
-      (error) => {
-        console.error('❌ API Request Error:', error);
-        return Promise.reject(error);
-      }
-    );
+interface SaveResponseRequest {
+  assessmentType: 'Company' | 'Employee';
+  companyId: string;
+  employeeId?: string;
+  responses: Record<string, any>;
+}
 
-    // Response interceptor with enhanced error handling
-    this.api.interceptors.response.use(
-      (response: AxiosResponse) => {
-        const requestId = response.config.headers['X-Request-ID'];
-        
-        if (config.isDev()) {
-          console.log(`✅ API Response [${requestId}]:`, {
-            status: response.status,
-            statusText: response.statusText,
-            url: response.config.url,
-            responseTime: response.headers['x-response-time']
-          });
-        }
-        
-        return response;
-      },
-      (error: AxiosError) => {
-        return this.handleApiError(error);
-      }
-    );
-  }
+interface FileUploadRequest {
+  companyId: string;
+  questionId: string;
+  file: File;
+}
+
+interface FileUploadResponse {
+  message: string;
+  fileKey: string;
+  downloadUrl: string;
+  fileName: string;
+}
+
+class APIServiceClass {
+  private config: ApiConfig | null = null;
+  private requestId = 0;
 
   /**
-   * Enhanced error handling with configuration-aware responses
+   * Initialize the API service with configuration
    */
-  private handleApiError(error: AxiosError): Promise<never> {
-    const requestId = error.config?.headers?.['X-Request-ID'] || 'unknown';
-    
-    console.error(`❌ API Error [${requestId}]:`, {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      url: error.config?.url
-    });
-
-    // Network-specific errors
-    if (error.code === 'ECONNABORTED') {
-      return Promise.reject(new NetworkError(
-        `Request timeout after ${this.config.timeout}ms. Please check your connection and try again.`
-      ));
-    }
-
-    if (!error.response) {
-      const message = config.isDev() 
-        ? `Network error: ${error.message}. Please check your internet connection.`
-        : 'Network error. Please check your internet connection.';
-      return Promise.reject(new NetworkError(message));
-    }
-
-    const { status, data } = error.response;
-    const message = (data as any)?.error || (data as any)?.message || 'An unexpected error occurred';
-
-    // Enhanced error messages based on environment
-    const getEnhancedMessage = (defaultMessage: string, details?: string) => {
-      if (config.isDev() && details) {
-        return `${defaultMessage} (Debug: ${details})`;
-      }
-      return defaultMessage;
+  initialize(baseUrl: string) {
+    this.config = {
+      baseUrl: baseUrl.replace(/\/$/, ''), // Remove trailing slash
+      timeout: 30000, // 30 seconds
+      retryAttempts: 3,
+      retryDelay: 1000 // 1 second
     };
-
-    switch (status) {
-      case 400:
-        return Promise.reject(new ValidationError(getEnhancedMessage(message, `Request ID: ${requestId}`)));
-      case 401:
-        return Promise.reject(new NetworkError('Unauthorized access. Please check your permissions.', 401));
-      case 403:
-        return Promise.reject(new NetworkError('Access forbidden. Contact your administrator.', 403));
-      case 404:
-        return Promise.reject(new NetworkError('Resource not found. The requested data may have been moved or deleted.', 404));
-      case 409:
-        return Promise.reject(new ValidationError('Conflict: Resource already exists or has been modified.'));
-      case 422:
-        return Promise.reject(new ValidationError(getEnhancedMessage(message, 'Validation failed')));
-      case 429:
-        return Promise.reject(new NetworkError('Too many requests. Please wait a moment and try again.', 429));
-      case 500:
-        const serverMessage = config.isDev() 
-          ? `Server error: ${message} (Request ID: ${requestId})`
-          : 'Server error. Our team has been notified. Please try again later.';
-        return Promise.reject(new NetworkError(serverMessage, 500));
-      case 502:
-      case 503:
-      case 504:
-        return Promise.reject(new NetworkError(
-          'Service temporarily unavailable. Please try again in a few moments.', 
-          status
-        ));
-      default:
-        return Promise.reject(new NetworkError(
-          getEnhancedMessage(message, `HTTP ${status} - Request ID: ${requestId}`), 
-          status
-        ));
-    }
+    
+    console.log('🔧 API Service initialized:', this.config);
   }
 
   /**
-   * Enhanced question fetching with caching and validation
+   * Get current configuration
    */
-  async getQuestions(assessmentType: 'Company' | 'Employee'): Promise<Question[]> {
-    try {
-      console.log(`📊 Fetching ${assessmentType} questions...`);
-      
-      const response = await this.api.get<Question[]>(`/questions/${assessmentType}`);
-      
-      if (!Array.isArray(response.data)) {
-        throw new ValidationError('Invalid questions format received from server');
-      }
-
-      // Enhanced question validation
-      response.data.forEach((question, index) => {
-        if (!question.id || !question.type || !question.title) {
-          throw new ValidationError(`Invalid question structure at index ${index}: missing required fields`);
-        }
-        
-        // Validate question type
-        const validTypes = ['text', 'textarea', 'select', 'multiselect', 'radio', 'checkbox', 'file', 'rating', 'date'];
-        if (!validTypes.includes(question.type)) {
-          console.warn(`⚠️ Unknown question type: ${question.type} for question ${question.id}`);
-        }
-        
-        // Validate required fields for specific question types
-        if (question.type === 'select' || question.type === 'multiselect' || question.type === 'radio' || question.type === 'checkbox') {
-          if (!question.options || !Array.isArray(question.options) || question.options.length === 0) {
-            throw new ValidationError(`Question ${question.id} requires options for type ${question.type}`);
-          }
-        }
-      });
-
-      console.log(`✅ Successfully loaded ${response.data.length} ${assessmentType} questions`);
-      return response.data;
-      
-    } catch (error) {
-      if (error instanceof ValidationError || error instanceof NetworkError) {
-        throw error;
-      }
-      throw new NetworkError(`Failed to load ${assessmentType} questions. Please try again.`);
+  getConfig(): ApiConfig {
+    if (!this.config) {
+      throw new Error('API Service not initialized. Call initialize() first.');
     }
+    return this.config;
   }
 
   /**
-   * Enhanced response saving with optimistic updates
+   * Generate unique request ID for tracking
    */
-  async saveResponse(request: SaveRequest): Promise<ApiResponse> {
+  private generateRequestId(): string {
+    return `req-${Date.now()}-${++this.requestId}`;
+  }
+
+  /**
+   * Make HTTP request with retry logic and error handling
+   */
+  private async makeRequest<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    retryCount = 0
+  ): Promise<ApiResponse<T>> {
+    const config = this.getConfig();
+    const requestId = this.generateRequestId();
+    const url = `${config.baseUrl}${endpoint}`;
+    
+    console.log(`🌐 [${requestId}] ${options.method || 'GET'} ${url}`);
+    
     try {
-      console.log(`💾 Saving ${request.assessmentType} assessment response...`);
-      
-      // Enhanced validation
-      if (!request.assessmentType || !request.companyId) {
-        throw new ValidationError('Assessment type and company ID are required');
-      }
-
-      if (request.assessmentType === 'Employee' && !request.employeeId) {
-        throw new ValidationError('Employee ID is required for employee assessments');
-      }
-
-      // Validate responses object
-      if (!request.responses || typeof request.responses !== 'object') {
-        throw new ValidationError('Responses must be a valid object');
-      }
-
-      // Add metadata to request
-      const enhancedRequest = {
-        ...request,
-        metadata: {
-          timestamp: new Date().toISOString(),
-          appVersion: config.getConfig().appVersion,
-          environment: config.getConfig().environment,
-          userAgent: navigator.userAgent,
-          responseCount: Object.keys(request.responses).length
-        }
+      // Set default headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-Request-ID': requestId,
+        'X-Timestamp': new Date().toISOString(),
+        ...options.headers
       };
 
-      const response = await this.api.post<ApiResponse>('/responses', enhancedRequest);
-      
-      console.log(`✅ Successfully saved ${request.assessmentType} assessment response`);
-      return response.data;
-      
-    } catch (error) {
-      if (error instanceof ValidationError || error instanceof NetworkError) {
-        throw error;
-      }
-      throw new NetworkError('Failed to save response. Please try again.');
-    }
-  }
+      // Create request with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), config.timeout);
 
-  /**
-   * Enhanced response retrieval with caching support
-   */
-  async getResponse(
-    assessmentType: 'Company' | 'Employee',
-    companyId: string,
-    employeeId?: string
-  ): Promise<AssessmentData | null> {
-    try {
-      if (!assessmentType || !companyId) {
-        throw new ValidationError('Assessment type and company ID are required');
-      }
-
-      if (assessmentType === 'Employee' && !employeeId) {
-        throw new ValidationError('Employee ID is required for employee assessments');
-      }
-
-      const url = employeeId 
-        ? `/responses/${assessmentType}/${companyId}/${employeeId}`
-        : `/responses/${assessmentType}/${companyId}`;
-
-      console.log(`📖 Retrieving ${assessmentType} assessment response...`);
-      
-      const response = await this.api.get<AssessmentData>(url);
-      
-      console.log(`✅ Successfully retrieved ${assessmentType} assessment response`);
-      return response.data;
-      
-    } catch (error) {
-      if (error instanceof NetworkError && error.statusCode === 404) {
-        console.log(`ℹ️ No existing ${assessmentType} response found`);
-        return null; // No existing response found
-      }
-      
-      if (error instanceof ValidationError || error instanceof NetworkError) {
-        throw error;
-      }
-      
-      throw new NetworkError('Failed to load existing response.');
-    }
-  }
-
-  /**
-   * Enhanced file upload with progress tracking and validation
-   */
-  async uploadFile(
-    companyId: string,
-    questionId: string,
-    file: File,
-    onProgress?: (progress: number) => void
-  ): Promise<FileUpload> {
-    try {
-      console.log(`📎 Uploading file: ${file.name} (${this.formatFileSize(file.size)})`);
-      
-      // Get file upload configuration
-      const fileConfig = config.getFileUploadConfig();
-      
-      // Enhanced validation with configuration
-      if (!companyId || !questionId || !file) {
-        throw new ValidationError('Company ID, question ID, and file are required');
-      }
-
-      // Validate file size using configuration
-      if (file.size > fileConfig.maxSize) {
-        throw new FileUploadError(
-          `File size must be less than ${config.getFormattedMaxFileSize()}`, 
-          file.name
-        );
-      }
-
-      // Validate file type using configuration
-      if (!fileConfig.supportedTypes.includes(file.type)) {
-        throw new FileUploadError(
-          `File type not supported. Supported types: ${config.getFormattedSupportedFileTypes()}`, 
-          file.name
-        );
-      }
-
-      // Additional security checks
-      const fileName = file.name.toLowerCase();
-      const dangerousExtensions = ['.exe', '.bat', '.cmd', '.scr', '.pif', '.vbs', '.js'];
-      if (dangerousExtensions.some(ext => fileName.endsWith(ext))) {
-        throw new FileUploadError('File type not allowed for security reasons', file.name);
-      }
-
-      // Convert file to base64
-      const fileContent = await this.fileToBase64(file);
-
-      const uploadData = {
-        companyId,
-        questionId,
-        fileName: file.name,
-        fileContent,
-        contentType: file.type,
-        metadata: {
-          originalSize: file.size,
-          lastModified: new Date(file.lastModified).toISOString(),
-          uploadTimestamp: new Date().toISOString()
-        }
-      };
-
-      const response = await this.api.post<{
-        message: string;
-        fileKey: string;
-        downloadUrl: string;
-        fileName: string;
-      }>('/files', uploadData, {
-        timeout: 900000, // 15 minutes for large files
-        onUploadProgress: (progressEvent) => {
-          if (onProgress && progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onProgress(progress);
-          }
-        }
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal
       });
 
-      console.log(`✅ Successfully uploaded file: ${file.name}`);
+      clearTimeout(timeoutId);
 
+      // Handle HTTP errors
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      // Parse response
+      const data = await response.json();
+      
+      console.log(`✅ [${requestId}] Request successful`);
+      
       return {
-        fileName: response.data.fileName,
-        fileKey: response.data.fileKey,
-        downloadUrl: response.data.downloadUrl,
-        uploadDate: new Date().toISOString(),
-        fileSize: file.size,
-        contentType: file.type
+        data,
+        success: true,
+        timestamp: new Date().toISOString()
       };
-      
+
     } catch (error) {
-      console.error(`❌ File upload failed for ${file.name}:`, error);
-      
-      if (error instanceof ValidationError || error instanceof FileUploadError) {
-        throw error;
+      console.error(`❌ [${requestId}] Request failed:`, error);
+
+      // Retry logic for network errors
+      if (retryCount < config.retryAttempts && this.isRetryableError(error)) {
+        console.log(`🔄 [${requestId}] Retrying request (${retryCount + 1}/${config.retryAttempts})...`);
+        
+        await this.delay(config.retryDelay * Math.pow(2, retryCount)); // Exponential backoff
+        return this.makeRequest<T>(endpoint, options, retryCount + 1);
       }
+
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       
-      if (error instanceof NetworkError) {
-        throw new FileUploadError(`Upload failed: ${error.message}`, file.name);
-      }
-      
-      throw new FileUploadError('File upload failed. Please try again.', file.name);
+      return {
+        success: false,
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      };
     }
   }
 
   /**
-   * Enhanced file to base64 conversion with error handling
+   * Check if error is retryable
    */
-  private fileToBase64(file: File): Promise<string> {
+  private isRetryableError(error: any): boolean {
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      return true; // Network error
+    }
+    
+    if (error.name === 'AbortError') {
+      return true; // Timeout
+    }
+    
+    return false;
+  }
+
+  /**
+   * Delay utility for retry logic
+   */
+  private delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Convert File to base64 string
+   */
+  private async fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
       reader.onload = () => {
-        try {
-          const result = reader.result as string;
-          if (!result || !result.includes(',')) {
-            throw new Error('Invalid file data');
-          }
-          // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
-          const base64 = result.split(',')[1];
-          resolve(base64);
-        } catch (error) {
-          reject(new Error('Failed to process file'));
-        }
+        const result = reader.result as string;
+        // Remove data:mime/type;base64, prefix
+        const base64 = result.split(',')[1];
+        resolve(base64);
       };
-      
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-      
-      reader.onabort = () => {
-        reject(new Error('File reading was aborted'));
-      };
-      
+      reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }
 
   /**
-   * Format file size for display
+   * Validate file for upload
    */
-  private formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  private validateFile(file: File): void {
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'text/csv',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'application/zip',
+      'application/x-zip-compressed'
+    ];
+
+    if (file.size > maxSize) {
+      throw new Error(`File size (${Math.round(file.size / 1024 / 1024)}MB) exceeds maximum allowed size (50MB)`);
+    }
+
+    if (!allowedTypes.includes(file.type)) {
+      throw new Error(`File type '${file.type}' is not allowed. Please upload PDF, Word, Excel, text, image, or ZIP files.`);
+    }
+  }
+
+  // ===== PUBLIC API METHODS =====
+
+  /**
+   * Get questions for assessment type
+   */
+  async getQuestions(type: 'Company' | 'Employee'): Promise<QuestionSet> {
+    console.log(`📋 Fetching ${type} questions...`);
+    
+    const response = await this.makeRequest<QuestionSet>(`/questions/${type}`);
+    
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to fetch questions');
+    }
+
+    // Validate response structure
+    if (!response.data.questions || !Array.isArray(response.data.questions)) {
+      throw new Error('Invalid questions format received from server');
+    }
+
+    console.log(`✅ Loaded ${response.data.questions.length} ${type} questions`);
+    return response.data;
   }
 
   /**
-   * Enhanced API health check with detailed diagnostics
+   * Save assessment response
    */
-  async checkHealth(): Promise<{ healthy: boolean; details?: any }> {
+  async saveResponse(request: SaveResponseRequest): Promise<void> {
+    console.log(`💾 Saving ${request.assessmentType} assessment response...`);
+    
+    const response = await this.makeRequest('/responses', {
+      method: 'POST',
+      body: JSON.stringify(request)
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to save assessment response');
+    }
+
+    console.log('✅ Assessment response saved successfully');
+  }
+
+  /**
+   * Get existing assessment response
+   */
+  async getResponse(type: 'Company' | 'Employee', companyId: string, employeeId?: string): Promise<any> {
+    console.log(`📂 Fetching existing ${type} assessment response...`);
+    
+    let endpoint = `/responses/${type}/${companyId}`;
+    if (type === 'Employee' && employeeId) {
+      endpoint += `/${employeeId}`;
+    }
+
+    const response = await this.makeRequest(endpoint);
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to fetch assessment response');
+    }
+
+    console.log('✅ Assessment response loaded successfully');
+    return response.data;
+  }
+
+  /**
+   * Upload file for assessment question
+   */
+  async uploadFile(request: FileUploadRequest): Promise<FileUploadResponse> {
+    console.log(`📎 Uploading file: ${request.file.name} (${Math.round(request.file.size / 1024)}KB)`);
+    
+    // Validate file
+    this.validateFile(request.file);
+    
+    // Convert file to base64
+    const fileContent = await this.fileToBase64(request.file);
+    
+    const uploadData = {
+      companyId: request.companyId,
+      questionId: request.questionId,
+      fileName: request.file.name,
+      fileContent: fileContent,
+      contentType: request.file.type
+    };
+
+    const response = await this.makeRequest<FileUploadResponse>('/files', {
+      method: 'POST',
+      body: JSON.stringify(uploadData)
+    });
+
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to upload file');
+    }
+
+    console.log(`✅ File uploaded successfully: ${response.data.fileKey}`);
+    return response.data;
+  }
+
+  /**
+   * Health check to verify API connectivity
+   */
+  async healthCheck(): Promise<boolean> {
     try {
-      console.log('🏥 Checking API health...');
+      console.log('🏥 Performing API health check...');
       
-      const startTime = Date.now();
-      const response = await this.api.get('/health', { timeout: 5000 });
-      const responseTime = Date.now() - startTime;
+      // Try to fetch company questions as a health check
+      const response = await this.makeRequest('/questions/Company');
       
-      const isHealthy = response.status === 200;
-      
-      const details = {
-        status: response.status,
-        responseTime,
-        timestamp: new Date().toISOString(),
-        baseUrl: this.baseURL,
-        version: response.data?.version,
-        environment: response.data?.environment
-      };
-      
-      if (isHealthy) {
-        console.log(`✅ API health check passed (${responseTime}ms)`);
+      if (response.success) {
+        console.log('✅ API health check passed');
+        return true;
       } else {
-        console.warn(`⚠️ API health check returned status ${response.status}`);
+        console.warn('⚠️ API health check failed:', response.error);
+        return false;
       }
-      
-      return { healthy: isHealthy, details };
-      
     } catch (error) {
-      console.error('❌ API health check failed:', error);
-      return { 
-        healthy: false, 
-        details: { 
-          error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date().toISOString(),
-          baseUrl: this.baseURL
-        }
-      };
+      console.error('❌ API health check error:', error);
+      return false;
     }
   }
 
   /**
-   * Get comprehensive API information
+   * Get API status information
    */
-  getApiInfo() {
+  getStatus(): {
+    initialized: boolean;
+    baseUrl: string | null;
+    config: ApiConfig | null;
+  } {
     return {
-      baseURL: this.baseURL,
-      timeout: this.config.timeout,
-      maxRetries: this.config.maxRetries,
-      endpoints: this.config.endpoints,
-      environment: config.getConfig().environment,
-      version: config.getConfig().appVersion,
-      region: config.getAwsConfig().region
+      initialized: this.config !== null,
+      baseUrl: this.config?.baseUrl || null,
+      config: this.config
     };
-  }
-
-  /**
-   * Update configuration at runtime
-   */
-  updateConfiguration() {
-    this.config = config.getApiConfig();
-    this.api.defaults.timeout = this.config.timeout;
-    console.log('🔄 API configuration updated');
   }
 }
 
-// Singleton instance with enhanced management
-let apiServiceInstance: ApiService | null = null;
+// Export singleton instance
+export const APIService = new APIServiceClass();
 
-/**
- * Initialize API service with dynamic configuration
- */
-export const initializeApiService = (baseURL?: string): ApiService => {
-  const configuredBaseURL = baseURL || config.getApiConfig().baseUrl;
-  
-  if (!configuredBaseURL) {
-    throw new Error('API base URL not configured. Please check your environment configuration.');
-  }
-  
-  apiServiceInstance = new ApiService(configuredBaseURL);
-  
-  console.log('🔗 API Service initialized:', {
-    baseURL: configuredBaseURL,
-    environment: config.getConfig().environment,
-    timeout: config.getApiConfig().timeout
-  });
-  
-  return apiServiceInstance;
+// Export for direct use
+export default APIService;
+
+// Utility function to initialize API service
+export const initializeApiService = (baseUrl: string): void => {
+  APIService.initialize(baseUrl);
 };
 
-/**
- * Get API service instance with validation
- */
-export const getApiService = (): ApiService => {
-  if (!apiServiceInstance) {
-    // Try to auto-initialize with configuration
-    try {
-      return initializeApiService();
-    } catch (error) {
-      throw new Error('API service not initialized and auto-initialization failed. Please call initializeApiService first.');
-    }
-  }
-  return apiServiceInstance;
+// Export types for use in components
+export type {
+  ApiConfig,
+  ApiResponse,
+  SaveResponseRequest,
+  FileUploadRequest,
+  FileUploadResponse
 };
-
-/**
- * Enhanced API response handler with retry logic
- */
-export const handleApiResponse = async <T>(
-  apiCall: () => Promise<T>,
-  options: {
-    errorMessage?: string;
-    retries?: number;
-    retryDelay?: number;
-  } = {}
-): Promise<T> => {
-  const {
-    errorMessage = 'An error occurred',
-    retries = config.getApiConfig().maxRetries,
-    retryDelay = 1000
-  } = options;
-
-  let lastError: Error;
-  
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      return await apiCall();
-    } catch (error) {
-      lastError = error as Error;
-      
-      // Don't retry validation errors or client errors
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-      
-      if (error instanceof NetworkError && error.statusCode && error.statusCode < 500) {
-        throw error;
-      }
-      
-      if (attempt === retries) {
-        break;
-      }
-      
-      console.log(`🔄 Retrying API call (${attempt}/${retries}) in ${retryDelay}ms...`);
-      await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
-    }
-  }
-  
-  console.error(`❌ API call failed after ${retries} attempts`);
-  throw lastError!;
-};
-
-/**
- * Retry wrapper with exponential backoff
- */
-export const withRetry = async <T>(
-  apiCall: () => Promise<T>,
-  maxRetries: number = config.getApiConfig().maxRetries,
-  baseDelay: number = 1000
-): Promise<T> => {
-  return handleApiResponse(apiCall, {
-    retries: maxRetries,
-    retryDelay: baseDelay
-  });
-};
-
-export default ApiService;
