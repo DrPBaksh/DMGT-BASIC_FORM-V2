@@ -40,7 +40,13 @@ Resources:
         RestrictPublicBuckets: true
       WebsiteConfiguration:
         IndexDocument: index.html
-        ErrorDocument: index.html # For SPA routing
+        ErrorDocument: error.html
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
       VersioningConfiguration:
         Status: Enabled
 
@@ -71,6 +77,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
       VersioningConfiguration:
         Status: Enabled
 
@@ -84,6 +96,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
       VersioningConfiguration:
         Status: Enabled
 
@@ -97,6 +115,12 @@ Resources:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, PUT, POST, DELETE, HEAD, OPTIONS]
+            AllowedOrigins: ['*']
+            MaxAge: 3000
       VersioningConfiguration:
         Status: Enabled
 
@@ -177,13 +201,74 @@ Resources:
       Handler: get_questions.handler
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 30
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: 'lambda_package.zip'
+      Timeout: 60
       Environment:
         Variables:
           CONFIG_BUCKET: !Ref ConfigBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': '*',
+                      'Access-Control-Allow-Methods': '*'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Get assessment type from path
+                  assessment_type = event['pathParameters']['type']
+                  if assessment_type not in ['Company', 'Employee']:
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Invalid assessment type'})
+                      }
+                  
+                  bucket = os.environ['CONFIG_BUCKET']
+                  key = f'config/{assessment_type}.json'
+                  
+                  # Get questions from S3
+                  response = s3.get_object(Bucket=bucket, Key=key)
+                  questions = json.loads(response['Body'].read())
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps(questions)
+                  }
+                  
+              except ClientError as e:
+                  if e.response['Error']['Code'] == 'NoSuchKey':
+                      return {
+                          'statusCode': 404,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Questions not found'})
+                      }
+                  raise
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
 
   SaveResponseFunction:
     Type: AWS::Lambda::Function
@@ -192,13 +277,97 @@ Resources:
       Handler: save_response.handler
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 30
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: 'lambda_package.zip'
+      Timeout: 60
       Environment:
         Variables:
           RESPONSES_BUCKET: !Ref ResponsesBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from datetime import datetime
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': '*',
+                      'Access-Control-Allow-Methods': '*'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Parse request body
+                  body = json.loads(event['body'])
+                  assessment_type = body.get('assessmentType')
+                  company_id = body.get('companyId')
+                  employee_id = body.get('employeeId')
+                  responses = body.get('responses', {})
+                  
+                  if not assessment_type or not company_id:
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Missing required fields'})
+                      }
+                  
+                  bucket = os.environ['RESPONSES_BUCKET']
+                  
+                  # Determine S3 key based on assessment type
+                  if assessment_type == 'Company':
+                      key = f'company-responses/{company_id}.json'
+                  else:
+                      if not employee_id:
+                          return {
+                              'statusCode': 400,
+                              'headers': headers,
+                              'body': json.dumps({'error': 'Employee ID required for employee assessment'})
+                          }
+                      key = f'employee-responses/{company_id}/{employee_id}.json'
+                  
+                  # Prepare response data
+                  response_data = {
+                      'assessmentType': assessment_type,
+                      'companyId': company_id,
+                      'employeeId': employee_id,
+                      'responses': responses,
+                      'lastUpdated': datetime.utcnow().isoformat(),
+                      'version': '1.0'
+                  }
+                  
+                  # Save to S3
+                  s3.put_object(
+                      Bucket=bucket,
+                      Key=key,
+                      Body=json.dumps(response_data, indent=2),
+                      ContentType='application/json'
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps({'message': 'Response saved successfully', 'key': key})
+                  }
+                  
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
 
   GetResponseFunction:
     Type: AWS::Lambda::Function
@@ -207,13 +376,81 @@ Resources:
       Handler: get_response.handler
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 30
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: 'lambda_package.zip'
+      Timeout: 60
       Environment:
         Variables:
           RESPONSES_BUCKET: !Ref ResponsesBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': '*',
+                      'Access-Control-Allow-Methods': '*'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Get parameters
+                  assessment_type = event['pathParameters']['type']
+                  company_id = event['pathParameters']['companyId']
+                  employee_id = event['pathParameters'].get('employeeId')
+                  
+                  bucket = os.environ['RESPONSES_BUCKET']
+                  
+                  # Determine S3 key
+                  if assessment_type == 'Company':
+                      key = f'company-responses/{company_id}.json'
+                  else:
+                      if not employee_id:
+                          return {
+                              'statusCode': 400,
+                              'headers': headers,
+                              'body': json.dumps({'error': 'Employee ID required'})
+                          }
+                      key = f'employee-responses/{company_id}/{employee_id}.json'
+                  
+                  # Get response from S3
+                  response = s3.get_object(Bucket=bucket, Key=key)
+                  response_data = json.loads(response['Body'].read())
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps(response_data)
+                  }
+                  
+              except ClientError as e:
+                  if e.response['Error']['Code'] == 'NoSuchKey':
+                      return {
+                          'statusCode': 404,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Response not found'})
+                      }
+                  raise
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
 
   FileUploadFunction:
     Type: AWS::Lambda::Function
@@ -222,16 +459,115 @@ Resources:
       Handler: file_upload.handler
       Runtime: python3.9
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 60
-      MemorySize: 512
-      Code:
-        S3Bucket: !Ref LambdaCodeBucket
-        S3Key: 'lambda_package.zip'
+      Timeout: 900
+      MemorySize: 1024
       Environment:
         Variables:
           FILES_BUCKET: !Ref FilesBucket
+          ENVIRONMENT: !Ref Environment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import base64
+          import uuid
+          from datetime import datetime
+          from botocore.exceptions import ClientError
+          
+          s3 = boto3.client('s3')
+          
+          def handler(event, context):
+              try:
+                  # Enable CORS
+                  headers = {
+                      'Access-Control-Allow-Origin': '*',
+                      'Access-Control-Allow-Headers': '*',
+                      'Access-Control-Allow-Methods': '*'
+                  }
+                  
+                  # Handle OPTIONS request
+                  if event.get('httpMethod') == 'OPTIONS':
+                      return {
+                          'statusCode': 200,
+                          'headers': headers,
+                          'body': json.dumps({'message': 'OK'})
+                      }
+                  
+                  # Parse request
+                  body = json.loads(event['body'])
+                  company_id = body.get('companyId')
+                  question_id = body.get('questionId')
+                  file_name = body.get('fileName')
+                  file_content = body.get('fileContent')  # base64 encoded
+                  content_type = body.get('contentType', 'application/octet-stream')
+                  
+                  if not all([company_id, question_id, file_name, file_content]):
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Missing required fields'})
+                      }
+                  
+                  # Decode file content
+                  try:
+                      file_data = base64.b64decode(file_content)
+                  except Exception:
+                      return {
+                          'statusCode': 400,
+                          'headers': headers,
+                          'body': json.dumps({'error': 'Invalid file content encoding'})
+                      }
+                  
+                  bucket = os.environ['FILES_BUCKET']
+                  
+                  # Generate unique file key
+                  timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+                  unique_id = str(uuid.uuid4())[:8]
+                  safe_filename = file_name.replace(' ', '_').replace('/', '_')
+                  key = f'company-files/{company_id}/{question_id}/{timestamp}_{unique_id}_{safe_filename}'
+                  
+                  # Upload to S3
+                  s3.put_object(
+                      Bucket=bucket,
+                      Key=key,
+                      Body=file_data,
+                      ContentType=content_type,
+                      Metadata={
+                          'original-filename': file_name,
+                          'upload-timestamp': datetime.utcnow().isoformat(),
+                          'company-id': company_id,
+                          'question-id': question_id
+                      }
+                  )
+                  
+                  # Generate presigned URL for access
+                  download_url = s3.generate_presigned_url(
+                      'get_object',
+                      Params={'Bucket': bucket, 'Key': key},
+                      ExpiresIn=3600  # 1 hour
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': headers,
+                      'body': json.dumps({
+                          'message': 'File uploaded successfully',
+                          'fileKey': key,
+                          'downloadUrl': download_url,
+                          'fileName': file_name
+                      })
+                  }
+                  
+              except Exception as e:
+                  print(f'Error: {str(e)}')
+                  return {
+                      'statusCode': 500,
+                      'headers': headers,
+                      'body': json.dumps({'error': 'Internal server error'})
+                  }
 
-  # API Gateway to expose Lambda functions
+  # API Gateway
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -271,6 +607,30 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GetQuestionsFunction.Arn}/invocations'
 
+  QuestionsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref QuestionsTypeResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
   ResponsesResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -290,7 +650,31 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SaveResponseFunction.Arn}/invocations'
 
-  ResponseTypeResource:
+  SaveResponseOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref RestApi
+      ResourceId: !Ref ResponsesResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  GetResponseResource:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref RestApi
@@ -354,24 +738,23 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FileUploadFunction.Arn}/invocations'
 
-  # This resource enables CORS by responding to OPTIONS requests on all endpoints.
-  ApiGatewayCors:
+  FilesOptionsMethod:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestApi
-      ResourceId: !Ref ResponsesResource # Apply to a parent resource
+      ResourceId: !Ref FilesResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
         Type: MOCK
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'*'"
+              method.response.header.Access-Control-Allow-Methods: "'*'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
       MethodResponses:
         - StatusCode: 200
           ResponseParameters:
@@ -379,15 +762,18 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # API Gateway Deployment Stage
+  # API Gateway Deployment
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - QuestionGetMethod
-      - ResponsePostMethod
-      - ResponseGetMethod
-      - ResponseEmployeeGetMethod
-      - FilePostMethod
+      - QuestionsMethod
+      - QuestionsOptionsMethod
+      - SaveResponseMethod
+      - SaveResponseOptionsMethod
+      - GetResponseMethod
+      - GetResponseEmployeeMethod
+      - FileUploadMethod
+      - FilesOptionsMethod
     Properties:
       RestApiId: !Ref RestApi
       StageName: !Ref Environment
