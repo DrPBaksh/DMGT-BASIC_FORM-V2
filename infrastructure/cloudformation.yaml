@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'DMGT Data & AI Readiness Assessment Form - Enhanced Enterprise AWS Infrastructure (v2.1)'
+Description: 'DMGT Data & AI Readiness Assessment Form - Enhanced Enterprise AWS Infrastructure (v2.2)'
 
 Parameters:
   Environment:
@@ -32,9 +32,9 @@ Resources:
     Properties:
       BucketName: !Sub '${BucketPrefix}-website-${AWS::AccountId}-${Environment}'
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
+        BlockPublicAcls: false
         BlockPublicPolicy: false
-        IgnorePublicAcls: true
+        IgnorePublicAcls: false
         RestrictPublicBuckets: false
       WebsiteConfiguration:
         IndexDocument: index.html
@@ -48,14 +48,63 @@ Resources:
       VersioningConfiguration:
         Status: Enabled
 
+  # CloudFront Origin Access Control (OAC) - Modern replacement for OAI
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${BucketPrefix}-oac-${Environment}'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+        Description: !Sub 'Origin access control for ${Environment} assessment form'
+
+  # CloudFront Distribution for fast, secure content delivery
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub 'DMGT Assessment Form - ${Environment}'
+        Enabled: true
+        DefaultRootObject: index.html
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: S3WebsiteOrigin
+            DomainName: !GetAtt WebsiteBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+        DefaultCacheBehavior:
+          TargetOriginId: S3WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+            Cookies: { Forward: none }
+          MinTTL: 0
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+        # Custom Error Response to handle client-side routing for the SPA
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+
   # S3 Bucket Policy to allow CloudFront to access the website content
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    DependsOn: CloudFrontDistribution
     Properties:
       Bucket: !Ref WebsiteBucket
       PolicyDocument:
         Statement:
-          - Sid: AllowCloudFrontServicePrincipal
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
             Effect: Allow
             Principal:
               Service: cloudfront.amazonaws.com
@@ -64,6 +113,11 @@ Resources:
             Condition:
               StringEquals:
                 'AWS:SourceArn': !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+          - Sid: AllowPublicReadAccess
+            Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
 
   # S3 Bucket for storing editable JSON question configurations
   ConfigBucket:
@@ -150,49 +204,6 @@ Resources:
             MaxAge: 3000
       VersioningConfiguration:
         Status: Enabled
-
-  # CloudFront Origin Access Identity (OAI)
-  CloudFrontOAI:
-    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
-    Properties:
-      CloudFrontOriginAccessIdentityConfig:
-        Comment: !Sub 'OAI for ${Environment} assessment form'
-
-  # CloudFront Distribution for fast, secure content delivery
-  CloudFrontDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Comment: !Sub 'DMGT Assessment Form - ${Environment}'
-        Enabled: true
-        DefaultRootObject: index.html
-        HttpVersion: http2
-        PriceClass: PriceClass_100
-        Origins:
-          - Id: S3WebsiteOrigin
-            DomainName: !GetAtt WebsiteBucket.DomainName
-            S3OriginConfig:
-              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOAI}'
-        DefaultCacheBehavior:
-          TargetOriginId: S3WebsiteOrigin
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [GET, HEAD, OPTIONS]
-          CachedMethods: [GET, HEAD, OPTIONS]
-          Compress: true
-          ForwardedValues:
-            QueryString: false
-            Cookies: { Forward: none }
-          MinTTL: 0
-          DefaultTTL: 86400
-          MaxTTL: 31536000
-        # Custom Error Response to handle client-side routing for the SPA
-        CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /index.html
 
   # IAM Role for Lambda functions execution
   LambdaExecutionRole:
