@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Question, ValidationError } from '../../types';
 import FileUpload from './FileUpload';
+import './forms.css';
 
 interface QuestionRendererProps {
   question: Question;
