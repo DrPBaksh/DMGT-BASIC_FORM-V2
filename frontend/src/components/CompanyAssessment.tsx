@@ -1,14 +1,17 @@
 /**
  * Enhanced CompanyAssessment Component for DMGT Basic Form V2
- * Amazing UX with comprehensive form handling, auto-save, and progress tracking
+ * Using shared QuestionRenderer for consistency and better UX
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { config } from '../services/config';
 import { getApiService, handleApiResponse } from '../services/api';
-import { Question, AssessmentData } from '../types';
+import { Question, AssessmentData, ValidationError } from '../types';
 import LoadingSpinner from './common/LoadingSpinner';
+import QuestionRenderer from './forms/QuestionRenderer';
+import ProgressBar from './forms/ProgressBar';
+import SaveIndicator from './forms/SaveIndicator';
 import './CompanyAssessment.css';
 
 interface LocationState {
@@ -20,10 +23,6 @@ interface FormData {
   [questionId: string]: any;
 }
 
-interface ValidationErrors {
-  [questionId: string]: string;
-}
-
 const CompanyAssessment: React.FC = () => {
   const { companyId } = useParams<{ companyId: string }>();
   const location = useLocation();
@@ -33,32 +32,34 @@ const CompanyAssessment: React.FC = () => {
   // Component State
   const [questions, setQuestions] = useState<Question[]>([]);
   const [formData, setFormData] = useState<FormData>({});
-  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentSection, setCurrentSection] = useState(0);
-  const [progress, setProgress] = useState(0);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showValidationSummary, setShowValidationSummary] = useState(false);
 
   const apiService = getApiService();
 
   /**
    * Calculate completion progress
    */
-  const calculateProgress = useCallback((data: FormData, questionsArray: Question[]) => {
-    if (questionsArray.length === 0) return 0;
+  const calculateProgress = useCallback(() => {
+    if (questions.length === 0) return { completed: 0, total: 0, percentage: 0 };
     
-    const answeredCount = questionsArray.filter(question => {
-      const answer = data[question.id];
-      if (question.required) {
-        return answer !== undefined && answer !== null && answer !== '';
-      }
-      return true; // Optional questions don't affect progress
+    const answeredQuestions = questions.filter(question => {
+      const answer = formData[question.id];
+      return answer !== undefined && answer !== null && answer !== '';
     }).length;
     
-    return Math.round((answeredCount / questionsArray.length) * 100);
-  }, []);
+    return {
+      completed: answeredQuestions,
+      total: questions.length,
+      percentage: Math.round((answeredQuestions / questions.length) * 100)
+    };
+  }, [formData, questions]);
 
   /**
    * Group questions into logical sections
@@ -136,7 +137,7 @@ const CompanyAssessment: React.FC = () => {
 
       } catch (error) {
         console.error('Failed to load assessment:', error);
-        setErrors({ general: 'Failed to load assessment. Please try again.' });
+        setValidationErrors([{ field: 'general', message: 'Failed to load assessment. Please try again.' }]);
       } finally {
         setIsLoading(false);
       }
@@ -144,14 +145,6 @@ const CompanyAssessment: React.FC = () => {
 
     loadAssessment();
   }, [companyId, apiService]);
-
-  /**
-   * Update progress when form data changes
-   */
-  useEffect(() => {
-    const newProgress = calculateProgress(formData, questions);
-    setProgress(newProgress);
-  }, [formData, questions, calculateProgress]);
 
   /**
    * Auto-save functionality
@@ -175,50 +168,81 @@ const CompanyAssessment: React.FC = () => {
   /**
    * Validate individual question
    */
-  const validateQuestion = useCallback((question: Question, value: any): string | null => {
+  const validateQuestion = useCallback((question: Question, value: any): ValidationError | null => {
     if (question.required && (value === undefined || value === null || value === '')) {
-      return `${question.title} is required`;
+      return {
+        field: question.id,
+        message: 'This field is required',
+        code: 'REQUIRED'
+      };
     }
 
-    if (question.validation) {
+    if (question.validation && value !== undefined && value !== null && value !== '') {
       const validation = question.validation;
 
       // String length validation
       if (typeof value === 'string') {
         if (validation.minLength && value.length < validation.minLength) {
-          return `Must be at least ${validation.minLength} characters`;
+          return {
+            field: question.id,
+            message: `Must be at least ${validation.minLength} characters`,
+            code: 'MIN_LENGTH'
+          };
         }
         if (validation.maxLength && value.length > validation.maxLength) {
-          return `Must be no more than ${validation.maxLength} characters`;
+          return {
+            field: question.id,
+            message: `Must be no more than ${validation.maxLength} characters`,
+            code: 'MAX_LENGTH'
+          };
         }
         if (validation.pattern && !new RegExp(validation.pattern).test(value)) {
-          return validation.patternMessage || 'Invalid format';
+          return {
+            field: question.id,
+            message: 'Please enter a valid format',
+            code: 'INVALID_FORMAT'
+          };
         }
       }
 
       // Number validation
       if (typeof value === 'number') {
         if (validation.min !== undefined && value < validation.min) {
-          return `Must be at least ${validation.min}`;
+          return {
+            field: question.id,
+            message: `Must be at least ${validation.min}`,
+            code: 'MIN_VALUE'
+          };
         }
         if (validation.max !== undefined && value > validation.max) {
-          return `Must be no more than ${validation.max}`;
-        }
-      }
-
-      // Array validation (for multiselect)
-      if (Array.isArray(value)) {
-        if (validation.minItems && value.length < validation.minItems) {
-          return `Please select at least ${validation.minItems} options`;
-        }
-        if (validation.maxItems && value.length > validation.maxItems) {
-          return `Please select no more than ${validation.maxItems} options`;
+          return {
+            field: question.id,
+            message: `Must be no more than ${validation.max}`,
+            code: 'MAX_VALUE'
+          };
         }
       }
     }
 
     return null;
   }, []);
+
+  /**
+   * Validate all questions
+   */
+  const validateAllQuestions = (): ValidationError[] => {
+    const errors: ValidationError[] = [];
+    
+    questions.forEach(question => {
+      const value = formData[question.id];
+      const error = validateQuestion(question, value);
+      if (error) {
+        errors.push(error);
+      }
+    });
+
+    return errors;
+  };
 
   /**
    * Handle form field changes
@@ -230,12 +254,27 @@ const CompanyAssessment: React.FC = () => {
     }));
 
     // Clear validation error for this field
-    setErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[questionId];
-      return newErrors;
-    });
+    setValidationErrors(prev => prev.filter(error => error.field !== questionId));
   }, []);
+
+  /**
+   * Handle file uploads
+   */
+  const handleFileUpload = async (questionId: string, files: FileList) => {
+    if (!companyId) return;
+
+    try {
+      const uploadedFiles = await apiService.uploadFiles(companyId, questionId, files);
+      handleFieldChange(questionId, uploadedFiles);
+    } catch (error) {
+      console.error('File upload failed:', error);
+      setValidationErrors(prev => [...prev, {
+        field: questionId,
+        message: 'File upload failed. Please try again.',
+        code: 'UPLOAD_ERROR'
+      }]);
+    }
+  };
 
   /**
    * Save assessment response
@@ -265,7 +304,11 @@ const CompanyAssessment: React.FC = () => {
       return response;
     } catch (error) {
       if (showUI) {
-        setErrors({ general: 'Failed to save assessment. Please try again.' });
+        setValidationErrors(prev => [...prev, {
+          field: 'general',
+          message: 'Failed to save assessment. Please try again.',
+          code: 'SAVE_ERROR'
+        }]);
       }
       throw error;
     } finally {
@@ -277,18 +320,11 @@ const CompanyAssessment: React.FC = () => {
    * Submit assessment
    */
   const handleSubmit = useCallback(async () => {
-    // Validate all required fields
-    const newErrors: ValidationErrors = {};
-    
-    questions.forEach(question => {
-      const error = validateQuestion(question, formData[question.id]);
-      if (error) {
-        newErrors[question.id] = error;
-      }
-    });
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    // Validate all questions
+    const errors = validateAllQuestions();
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      setShowValidationSummary(true);
       
       // Scroll to first error
       const firstErrorElement = document.querySelector('.form-field.error');
@@ -297,6 +333,7 @@ const CompanyAssessment: React.FC = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await saveResponse();
       
@@ -311,175 +348,12 @@ const CompanyAssessment: React.FC = () => {
       });
     } catch (error) {
       console.error('Submission failed:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-  }, [questions, formData, validateQuestion, saveResponse, navigate, companyId, state]);
+  }, [validateAllQuestions, saveResponse, navigate, companyId, state]);
 
-  /**
-   * Render question field based on type
-   */
-  const renderQuestionField = useCallback((question: Question) => {
-    const value = formData[question.id];
-    const error = errors[question.id];
-    const fieldId = `question-${question.id}`;
-
-    const commonProps = {
-      id: fieldId,
-      className: `form-input ${error ? 'error' : ''}`,
-      'aria-describedby': error ? `${fieldId}-error` : undefined,
-      'aria-required': question.required
-    };
-
-    switch (question.type) {
-      case 'text':
-        return (
-          <input
-            {...commonProps}
-            type="text"
-            value={value || ''}
-            onChange={(e) => handleFieldChange(question.id, e.target.value)}
-            placeholder={question.placeholder}
-          />
-        );
-
-      case 'textarea':
-        return (
-          <textarea
-            {...commonProps}
-            value={value || ''}
-            onChange={(e) => handleFieldChange(question.id, e.target.value)}
-            placeholder={question.placeholder}
-            rows={question.rows || 4}
-          />
-        );
-
-      case 'select':
-        return (
-          <select
-            {...commonProps}
-            value={value || ''}
-            onChange={(e) => handleFieldChange(question.id, e.target.value)}
-          >
-            <option value="">Select an option...</option>
-            {question.options?.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        );
-
-      case 'multiselect':
-        return (
-          <div className="multiselect-options">
-            {question.options?.map((option) => (
-              <label key={option.value} className="checkbox-option">
-                <input
-                  type="checkbox"
-                  checked={Array.isArray(value) && value.includes(option.value)}
-                  onChange={(e) => {
-                    const currentValues = Array.isArray(value) ? value : [];
-                    const newValues = e.target.checked
-                      ? [...currentValues, option.value]
-                      : currentValues.filter(v => v !== option.value);
-                    handleFieldChange(question.id, newValues);
-                  }}
-                />
-                <span className="checkbox-label">{option.label}</span>
-              </label>
-            ))}
-          </div>
-        );
-
-      case 'radio':
-        return (
-          <div className="radio-options">
-            {question.options?.map((option) => (
-              <label key={option.value} className="radio-option">
-                <input
-                  type="radio"
-                  name={fieldId}
-                  value={option.value}
-                  checked={value === option.value}
-                  onChange={(e) => handleFieldChange(question.id, e.target.value)}
-                />
-                <span className="radio-label">{option.label}</span>
-              </label>
-            ))}
-          </div>
-        );
-
-      case 'rating':
-        const maxRating = question.maxRating || 5;
-        return (
-          <div className="rating-input">
-            {Array.from({ length: maxRating }, (_, i) => i + 1).map(rating => (
-              <button
-                key={rating}
-                type="button"
-                className={`rating-star ${value >= rating ? 'filled' : ''}`}
-                onClick={() => handleFieldChange(question.id, rating)}
-                aria-label={`Rate ${rating} out of ${maxRating}`}
-              >
-                ★
-              </button>
-            ))}
-            {value && (
-              <span className="rating-text">{value} / {maxRating}</span>
-            )}
-          </div>
-        );
-
-      default:
-        return (
-          <input
-            {...commonProps}
-            type="text"
-            value={value || ''}
-            onChange={(e) => handleFieldChange(question.id, e.target.value)}
-            placeholder={question.placeholder}
-          />
-        );
-    }
-  }, [formData, errors, handleFieldChange]);
-
-  /**
-   * Render question component
-   */
-  const renderQuestion = useCallback((question: Question) => {
-    const error = errors[question.id];
-    
-    return (
-      <div key={question.id} className={`form-field ${error ? 'error' : ''}`}>
-        <label htmlFor={`question-${question.id}`} className="form-label">
-          <span className="label-text">
-            {question.title}
-            {question.required && <span className="required-indicator">*</span>}
-          </span>
-          {question.description && (
-            <span className="label-description">{question.description}</span>
-          )}
-        </label>
-        
-        <div className="field-wrapper">
-          {renderQuestionField(question)}
-          
-          {error && (
-            <div id={`question-${question.id}-error`} className="field-error" role="alert">
-              <span className="error-icon">⚠️</span>
-              {error}
-            </div>
-          )}
-          
-          {question.helpText && (
-            <div className="field-help">
-              <span className="help-icon">💡</span>
-              {question.helpText}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }, [errors, renderQuestionField]);
+  const progress = calculateProgress();
 
   if (isLoading) {
     return (
@@ -518,30 +392,15 @@ const CompanyAssessment: React.FC = () => {
             <span className="company-id">ID: {companyId}</span>
           </p>
         </div>
-        
-        {/* Progress Bar */}
-        <div className="progress-section">
-          <div className="progress-info">
-            <span className="progress-text">
-              Progress: {progress}% Complete
-            </span>
-            {lastSaved && (
-              <span className="last-saved">
-                Last saved: {lastSaved.toLocaleTimeString()}
-              </span>
-            )}
-          </div>
-          <div className="progress-bar">
-            <div 
-              className="progress-fill" 
-              style={{ width: `${progress}%` }}
-              role="progressbar"
-              aria-valuenow={progress}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            />
-          </div>
-        </div>
+      </div>
+
+      {/* Progress and Save Indicator */}
+      <div className="progress-section">
+        <ProgressBar progress={progress} showDetails={true} />
+        <SaveIndicator 
+          isSaving={isSaving}
+          lastSaved={lastSaved}
+        />
       </div>
 
       {/* Section Navigation */}
@@ -564,6 +423,33 @@ const CompanyAssessment: React.FC = () => {
         </div>
       )}
 
+      {/* Validation Summary */}
+      {showValidationSummary && validationErrors.length > 0 && (
+        <div className="card error-card">
+          <div className="card-header">
+            <h3>Please Complete Required Fields</h3>
+            <button 
+              className="close-btn"
+              onClick={() => setShowValidationSummary(false)}
+            >
+              ×
+            </button>
+          </div>
+          <div className="card-body">
+            <ul>
+              {validationErrors.map((error, index) => {
+                const question = questions.find(q => q.id === error.field);
+                return (
+                  <li key={index}>
+                    <strong>{question?.title || error.field}:</strong> {error.message}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* Assessment Form */}
       <div className="assessment-form">
         <div className="section-header">
@@ -571,19 +457,35 @@ const CompanyAssessment: React.FC = () => {
           <p className="section-description">{currentSectionData.description}</p>
         </div>
 
-        {errors.general && (
-          <div className="form-error-banner" role="alert">
-            <span className="error-icon">⚠️</span>
-            <div className="error-content">
-              <strong>Error</strong>
-              <p>{errors.general}</p>
-            </div>
-          </div>
-        )}
-
-        <form className="assessment-questions" onSubmit={(e) => e.preventDefault()}>
-          {currentSectionData.questions.map(renderQuestion)}
-        </form>
+        <div className="assessment-questions">
+          {currentSectionData.questions.map((question) => {
+            const error = validationErrors.find(e => e.field === question.id);
+            
+            return (
+              <div key={question.id} className="card question-card">
+                <div className="card-header">
+                  <h3 className="question-title">
+                    {question.title}
+                    {question.required && <span className="required-indicator">*</span>}
+                  </h3>
+                  {question.description && (
+                    <p className="question-description">{question.description}</p>
+                  )}
+                </div>
+                
+                <div className="card-body">
+                  <QuestionRenderer
+                    question={question}
+                    value={formData[question.id]}
+                    onChange={(value) => handleFieldChange(question.id, value)}
+                    onFileUpload={question.type === 'file' ? handleFileUpload : undefined}
+                    error={error}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Navigation & Actions */}
@@ -594,7 +496,7 @@ const CompanyAssessment: React.FC = () => {
             <>
               <button
                 type="button"
-                className="btn btn-secondary"
+                className="btn btn-outline"
                 disabled={currentSection === 0}
                 onClick={() => setCurrentSection(prev => Math.max(0, prev - 1))}
               >
@@ -612,18 +514,11 @@ const CompanyAssessment: React.FC = () => {
               ) : (
                 <button
                   type="button"
-                  className="btn btn-primary btn-submit"
+                  className="btn btn-primary"
                   onClick={handleSubmit}
-                  disabled={isSaving}
+                  disabled={isSubmitting || progress.percentage < 100}
                 >
-                  {isSaving ? (
-                    <>
-                      <span className="loading-spinner small"></span>
-                      Submitting...
-                    </>
-                  ) : (
-                    'Complete Assessment'
-                  )}
+                  {isSubmitting ? 'Submitting...' : 'Complete Assessment'}
                 </button>
               )}
             </>
@@ -633,25 +528,18 @@ const CompanyAssessment: React.FC = () => {
           {questionSections.length === 1 && (
             <button
               type="button"
-              className="btn btn-primary btn-submit"
+              className="btn btn-primary"
               onClick={handleSubmit}
-              disabled={isSaving}
+              disabled={isSubmitting || progress.percentage < 100}
             >
-              {isSaving ? (
-                <>
-                  <span className="loading-spinner small"></span>
-                  Submitting...
-                </>
-              ) : (
-                'Complete Assessment'
-              )}
+              {isSubmitting ? 'Submitting...' : 'Complete Assessment'}
             </button>
           )}
 
           {/* Save Progress Button */}
           <button
             type="button"
-            className="btn btn-outline save-button"
+            className="btn btn-outline"
             onClick={() => saveResponse(true)}
             disabled={isSaving}
           >
