@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'DMGT Data & AI Readiness Assessment Form - Enterprise AWS Infrastructure (v2)'
+Description: 'DMGT Data & AI Readiness Assessment Form - Enhanced Enterprise AWS Infrastructure (v2.1)'
 
 Parameters:
   Environment:
@@ -14,7 +14,6 @@ Parameters:
 
 Resources:
   # S3 Bucket for Lambda Function Code
-  # This bucket stores the zipped code for all Lambda functions.
   LambdaCodeBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -32,7 +31,6 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub '${BucketPrefix}-website-${AWS::AccountId}-${Environment}'
-      # Public access is blocked. Access is granted only via CloudFront OAI.
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -125,7 +123,6 @@ Resources:
         Status: Enabled
 
   # CloudFront Origin Access Identity (OAI)
-  # Allows CloudFront to securely access private S3 bucket content.
   CloudFrontOAI:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
@@ -193,15 +190,16 @@ Resources:
                   - !Sub 'arn:aws:s3:::${ResponsesBucket}/*'
                   - !Sub 'arn:aws:s3:::${FilesBucket}/*'
 
-  # Lambda Functions (Code is sourced from S3)
+  # Lambda Functions (Enhanced with proper timeouts)
   GetQuestionsFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub 'dmgt-assessment-get-questions-${Environment}'
       Handler: get_questions.handler
-      Runtime: python3.9
+      Runtime: python3.11
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 60
+      Timeout: 30
+      MemorySize: 256
       Environment:
         Variables:
           CONFIG_BUCKET: !Ref ConfigBucket
@@ -217,19 +215,20 @@ Resources:
           
           def handler(event, context):
               try:
-                  # Enable CORS
+                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
-                      'Access-Control-Allow-Methods': '*'
+                      'Access-Control-Allow-Methods': '*',
+                      'Access-Control-Allow-Credentials': 'true'
                   }
                   
-                  # Handle OPTIONS request
+                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
                       return {
                           'statusCode': 200,
                           'headers': headers,
-                          'body': json.dumps({'message': 'OK'})
+                          'body': json.dumps({'message': 'CORS preflight'})
                       }
                   
                   # Get assessment type from path
@@ -275,9 +274,10 @@ Resources:
     Properties:
       FunctionName: !Sub 'dmgt-assessment-save-response-${Environment}'
       Handler: save_response.handler
-      Runtime: python3.9
+      Runtime: python3.11
       Role: !GetAtt LambdaExecutionRole.Arn
       Timeout: 60
+      MemorySize: 512
       Environment:
         Variables:
           RESPONSES_BUCKET: !Ref ResponsesBucket
@@ -294,19 +294,20 @@ Resources:
           
           def handler(event, context):
               try:
-                  # Enable CORS
+                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
-                      'Access-Control-Allow-Methods': '*'
+                      'Access-Control-Allow-Methods': '*',
+                      'Access-Control-Allow-Credentials': 'true'
                   }
                   
-                  # Handle OPTIONS request
+                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
                       return {
                           'statusCode': 200,
                           'headers': headers,
-                          'body': json.dumps({'message': 'OK'})
+                          'body': json.dumps({'message': 'CORS preflight'})
                       }
                   
                   # Parse request body
@@ -374,9 +375,10 @@ Resources:
     Properties:
       FunctionName: !Sub 'dmgt-assessment-get-response-${Environment}'
       Handler: get_response.handler
-      Runtime: python3.9
+      Runtime: python3.11
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 60
+      Timeout: 30
+      MemorySize: 256
       Environment:
         Variables:
           RESPONSES_BUCKET: !Ref ResponsesBucket
@@ -392,19 +394,20 @@ Resources:
           
           def handler(event, context):
               try:
-                  # Enable CORS
+                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
-                      'Access-Control-Allow-Methods': '*'
+                      'Access-Control-Allow-Methods': '*',
+                      'Access-Control-Allow-Credentials': 'true'
                   }
                   
-                  # Handle OPTIONS request
+                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
                       return {
                           'statusCode': 200,
                           'headers': headers,
-                          'body': json.dumps({'message': 'OK'})
+                          'body': json.dumps({'message': 'CORS preflight'})
                       }
                   
                   # Get parameters
@@ -452,15 +455,16 @@ Resources:
                       'body': json.dumps({'error': 'Internal server error'})
                   }
 
+  # File Upload Function with extended timeout for large files
   FileUploadFunction:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: !Sub 'dmgt-assessment-file-upload-${Environment}'
       Handler: file_upload.handler
-      Runtime: python3.9
+      Runtime: python3.11
       Role: !GetAtt LambdaExecutionRole.Arn
-      Timeout: 900
-      MemorySize: 1024
+      Timeout: 900  # 15 minutes for large file uploads
+      MemorySize: 3008  # Maximum memory for better performance
       Environment:
         Variables:
           FILES_BUCKET: !Ref FilesBucket
@@ -479,19 +483,20 @@ Resources:
           
           def handler(event, context):
               try:
-                  # Enable CORS
+                  # Enable CORS for all origins
                   headers = {
                       'Access-Control-Allow-Origin': '*',
                       'Access-Control-Allow-Headers': '*',
-                      'Access-Control-Allow-Methods': '*'
+                      'Access-Control-Allow-Methods': '*',
+                      'Access-Control-Allow-Credentials': 'true'
                   }
                   
-                  # Handle OPTIONS request
+                  # Handle OPTIONS request for CORS preflight
                   if event.get('httpMethod') == 'OPTIONS':
                       return {
                           'statusCode': 200,
                           'headers': headers,
-                          'body': json.dumps({'message': 'OK'})
+                          'body': json.dumps({'message': 'CORS preflight'})
                       }
                   
                   # Parse request
@@ -567,7 +572,7 @@ Resources:
                       'body': json.dumps({'error': 'Internal server error'})
                   }
 
-  # API Gateway
+  # API Gateway with proper CORS
   RestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -575,12 +580,10 @@ Resources:
       Description: 'API for the DMGT Assessment Form'
       EndpointConfiguration:
         Types: [REGIONAL]
-      # Add a default binary media type for file uploads
       BinaryMediaTypes:
         - '*/*'
 
-  # API Gateway Resources and Methods
-  # Note: A resource for each part of the URL path
+  # API Gateway Resources and Methods with FIXED references
   QuestionsResource:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -611,7 +614,7 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref RestApi
-      ResourceId: !Ref QuestionsTypeResource
+      ResourceId: !Ref QuestionTypeResource  # FIXED: was QuestionsTypeResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
@@ -685,7 +688,7 @@ Resources:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref RestApi
-      ParentId: !Ref ResponseTypeResource
+      ParentId: !Ref GetResponseResource  # FIXED: was ResponseTypeResource
       PathPart: '{companyId}'
 
   ResponseGetMethod:
@@ -762,17 +765,17 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  # API Gateway Deployment
+  # API Gateway Deployment with FIXED dependencies
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - QuestionsMethod
+      - QuestionGetMethod
       - QuestionsOptionsMethod
-      - SaveResponseMethod
+      - ResponsePostMethod
       - SaveResponseOptionsMethod
-      - GetResponseMethod
-      - GetResponseEmployeeMethod
-      - FileUploadMethod
+      - ResponseGetMethod
+      - ResponseEmployeeGetMethod
+      - FilePostMethod
       - FilesOptionsMethod
     Properties:
       RestApiId: !Ref RestApi
@@ -812,27 +815,88 @@ Resources:
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*/*'
 
 Outputs:
-  WebsiteBucketName:
+  # Enhanced outputs for comprehensive .env generation
+  WebsiteBucket:
     Description: Name of the S3 bucket for the website
     Value: !Ref WebsiteBucket
-  ConfigBucketName:
+    Export:
+      Name: !Sub '${Environment}-WebsiteBucket'
+      
+  ConfigBucket:
     Description: Name of the S3 bucket for configuration files
     Value: !Ref ConfigBucket
-  ResponsesBucketName:
+    Export:
+      Name: !Sub '${Environment}-ConfigBucket'
+      
+  ResponsesBucket:
     Description: Name of the S3 bucket for response data
     Value: !Ref ResponsesBucket
-  FilesBucketName:
+    Export:
+      Name: !Sub '${Environment}-ResponsesBucket'
+      
+  FilesBucket:
     Description: Name of the S3 bucket for uploaded files
     Value: !Ref FilesBucket
-  LambdaCodeBucketName:
+    Export:
+      Name: !Sub '${Environment}-FilesBucket'
+      
+  LambdaCodeBucket:
     Description: Name of the S3 bucket for Lambda code
     Value: !Ref LambdaCodeBucket
-  CloudFrontDistributionId:
+    Export:
+      Name: !Sub '${Environment}-LambdaCodeBucket'
+      
+  CloudFrontDistribution:
     Description: ID of the CloudFront distribution
     Value: !Ref CloudFrontDistribution
-  CloudFrontDomainName:
-    Description: Domain name of the CloudFront distribution
-    Value: !GetAtt CloudFrontDistribution.DomainName
+    Export:
+      Name: !Sub '${Environment}-CloudFrontDistribution'
+      
+  CloudFrontUrl:
+    Description: CloudFront distribution domain name (primary access URL)
+    Value: !Sub 'https://${CloudFrontDistribution.DomainName}'
+    Export:
+      Name: !Sub '${Environment}-CloudFrontUrl'
+      
+  WebsiteUrl:
+    Description: S3 website endpoint (fallback URL)
+    Value: !Sub 'http://${WebsiteBucket}.s3-website-${AWS::Region}.amazonaws.com'
+    Export:
+      Name: !Sub '${Environment}-WebsiteUrl'
+      
   ApiGatewayUrl:
     Description: The invoke URL for the API Gateway stage
-    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+    Export:
+      Name: !Sub '${Environment}-ApiGatewayUrl'
+      
+  # Additional outputs for comprehensive configuration
+  GetQuestionsApiUrl:
+    Description: API endpoint for getting questions
+    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/questions'
+    Export:
+      Name: !Sub '${Environment}-GetQuestionsApiUrl'
+      
+  SaveResponseApiUrl:
+    Description: API endpoint for saving responses
+    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/responses'
+    Export:
+      Name: !Sub '${Environment}-SaveResponseApiUrl'
+      
+  FileUploadApiUrl:
+    Description: API endpoint for file uploads
+    Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/files'
+    Export:
+      Name: !Sub '${Environment}-FileUploadApiUrl'
+      
+  AwsRegion:
+    Description: AWS Region where resources are deployed
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Sub '${Environment}-AwsRegion'
+      
+  Environment:
+    Description: Environment name
+    Value: !Ref Environment
+    Export:
+      Name: !Sub '${Environment}-Environment'
