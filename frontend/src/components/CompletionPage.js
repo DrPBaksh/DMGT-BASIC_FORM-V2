@@ -7,15 +7,16 @@ import { useAssessment } from '../context/AssessmentContext';
 
 const CompletionPage = () => {
   const navigate = useNavigate();
-  const { state, clearAssessment } = useAssessment();
+  const { state, clearAssessment } = useAssessment(); // Correctly destructure only existing properties
   const { assessmentType, companyId, employeeId } = useParams();
 
   const handleStartNewAssessment = () => {
-    clearAssessment();
+    clearAssessment(); // Clear the current assessment
     navigate('/');
   };
 
   const handleDownloadResults = () => {
+    // Placeholder for download functionality
     alert('Results download functionality will be implemented in the full version.');
   };
 
@@ -107,6 +108,74 @@ const CompletionPage = () => {
           </div>
         </div>
 
+        {/* Next Steps */}
+        <div className="card">
+          <div className="card-header">
+            <h2 className="heading-3">What Happens Next?</h2>
+          </div>
+          <div className="card-body">
+            <div className="next-steps">
+              <div className="step">
+                <div className="step-number">1</div>
+                <div className="step-content">
+                  <h4>Data Processing</h4>
+                  <p>Your responses are being analyzed using our advanced assessment algorithms to generate comprehensive insights.</p>
+                </div>
+              </div>
+              
+              <div className="step">
+                <div className="step-number">2</div>
+                <div className="step-content">
+                  <h4>Report Generation</h4>
+                  <p>A detailed report with personalized recommendations and benchmarking data will be prepared for your organization.</p>
+                </div>
+              </div>
+              
+              <div className="step">
+                <div className="step-number">3</div>
+                <div className="step-content">
+                  <h4>Results Delivery</h4>
+                  <p>You will receive your comprehensive assessment report via email within 24-48 hours, including actionable insights and strategic recommendations.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Key Benefits */}
+        <div className="card">
+          <div className="card-header">
+            <h2 className="heading-3">Your Assessment Will Include</h2>
+          </div>
+          <div className="card-body">
+            <div className="benefits-grid">
+              <div className="benefit-item">
+                <div className="benefit-icon">📊</div>
+                <h4>Comprehensive Analysis</h4>
+                <p>Detailed evaluation of your current data and AI capabilities with scoring across multiple dimensions.</p>
+              </div>
+              
+              <div className="benefit-item">
+                <div className="benefit-icon">🎯</div>
+                <h4>Personalized Recommendations</h4>
+                <p>Tailored action plans and strategic recommendations based on your specific responses and industry context.</p>
+              </div>
+              
+              <div className="benefit-item">
+                <div className="benefit-icon">📈</div>
+                <h4>Benchmarking Insights</h4>
+                <p>Compare your readiness against industry standards and best practices from similar organizations.</p>
+              </div>
+              
+              <div className="benefit-item">
+                <div className="benefit-icon">🚀</div>
+                <h4>Implementation Roadmap</h4>
+                <p>Step-by-step guidance for improving your data and AI capabilities with prioritized initiatives.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Actions */}
         <div className="completion-actions">
           <button 
@@ -122,6 +191,22 @@ const CompletionPage = () => {
           >
             Start New Assessment
           </button>
+        </div>
+
+        {/* Contact Information */}
+        <div className="contact-card">
+          <h3>Need Assistance?</h3>
+          <p>
+            If you have questions about your assessment or need support, please don't hesitate to contact our team.
+          </p>
+          <div className="contact-methods">
+            <div className="contact-method">
+              <strong>Email:</strong> support@dmgt-assessment.com
+            </div>
+            <div className="contact-method">
+              <strong>Phone:</strong> +1 (555) 123-4567
+            </div>
+          </div>
         </div>
       </div>
     </div>
