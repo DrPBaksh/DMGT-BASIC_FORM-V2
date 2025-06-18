@@ -233,7 +233,8 @@ export const AssessmentProvider: React.FC<{
     }
 
     const autoSaveTimer = setTimeout(() => {
-      if (state.currentAssessment?.responses.length > 0) {
+      // More explicit checking to satisfy TypeScript strict mode
+      if (state.currentAssessment && state.currentAssessment.responses && state.currentAssessment.responses.length > 0) {
         saveAssessment();
       }
     }, 30000); // Auto-save every 30 seconds
