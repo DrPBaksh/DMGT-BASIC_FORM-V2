@@ -1,3 +1,0 @@
-// BACKUP: This TypeScript file has been converted to api.js
-// Please use the JavaScript version instead
-console.warn('Using backup TypeScript file. Please use api.js instead.');
