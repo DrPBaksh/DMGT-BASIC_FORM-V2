@@ -2,29 +2,56 @@
 // Professional header with navigation and branding
 
 import React from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import { useAssessment } from '../../context/AssessmentContext';
 import { formatTimeAgo } from '../../utils';
 import './Header.css';
 
 const Header: React.FC = () => {
-  const { state, navigation } = useAssessment();
+  const { state } = useAssessment();
+  const location = useLocation();
+  const { companyId, employeeId } = useParams<{ companyId?: string; employeeId?: string }>();
 
   const getPageTitle = () => {
-    switch (navigation.currentPage) {
-      case 'welcome':
-        return 'Welcome';
-      case 'company-form':
-        return 'Company Assessment';
-      case 'employee-form':
-        return 'Employee Assessment';
-      case 'completed':
-        return 'Assessment Complete';
-      default:
-        return 'DMGT Assessment';
+    const path = location.pathname;
+    
+    if (path === '/') {
+      return 'Welcome';
+    } else if (path.includes('/company')) {
+      return 'Company Assessment';
+    } else if (path.includes('/employee')) {
+      return 'Employee Assessment';
+    } else if (path.includes('/complete')) {
+      return 'Assessment Complete';
+    } else {
+      return 'DMGT Assessment';
     }
   };
 
-  const showProgress = navigation.currentPage === 'company-form' || navigation.currentPage === 'employee-form';
+  const getAssessmentType = (): 'Company' | 'Employee' | null => {
+    const path = location.pathname;
+    if (path.includes('/company')) return 'Company';
+    if (path.includes('/employee')) return 'Employee';
+    return null;
+  };
+
+  const showProgress = location.pathname.includes('/company') || location.pathname.includes('/employee');
+  const assessmentType = getAssessmentType();
+
+  // Calculate progress from current assessment state
+  const calculateProgress = () => {
+    if (!state.currentAssessment) {
+      return { completed: 0, total: 0, percentage: 0 };
+    }
+
+    const completed = state.currentAssessment.responses.length;
+    const total = state.questions[state.currentAssessment.type]?.questions.length || 0;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return { completed, total, percentage };
+  };
+
+  const progress = calculateProgress();
 
   return (
     <header className="header">
@@ -53,31 +80,33 @@ const Header: React.FC = () => {
         <div className="header-nav">
           <div className="page-info">
             <h2 className="page-title">{getPageTitle()}</h2>
-            {navigation.companyInfo && (
+            {(companyId || employeeId) && (
               <div className="company-info">
-                <span className="company-name">{navigation.companyInfo.name}</span>
-                {navigation.employeeInfo && (
-                  <span className="employee-name">• {navigation.employeeInfo.name}</span>
+                {companyId && (
+                  <span className="company-name">Company: {companyId}</span>
+                )}
+                {employeeId && (
+                  <span className="employee-name">• Employee: {employeeId}</span>
                 )}
               </div>
             )}
           </div>
 
           {/* Progress Section */}
-          {showProgress && (
+          {showProgress && state.currentAssessment && (
             <div className="progress-section">
               <div className="progress-info">
                 <span className="progress-text">
-                  {state.progress.completedQuestions.length} of {state.progress.totalQuestions} completed
+                  {progress.completed} of {progress.total} completed
                 </span>
                 <span className="progress-percentage">
-                  {state.progress.percentComplete}%
+                  {progress.percentage}%
                 </span>
               </div>
               <div className="progress-bar">
                 <div 
                   className="progress-fill"
-                  style={{ width: `${state.progress.percentComplete}%` }}
+                  style={{ width: `${progress.percentage}%` }}
                 />
               </div>
             </div>
@@ -87,31 +116,26 @@ const Header: React.FC = () => {
         {/* Status Indicators */}
         <div className="header-status">
           {/* Auto-save status */}
-          {showProgress && (
+          {showProgress && state.currentAssessment && (
             <div className="save-status">
-              {state.isSaving ? (
+              {state.loading.saving ? (
                 <div className="status-indicator saving">
                   <div className="status-icon spinning">⟳</div>
                   <span>Saving...</span>
                 </div>
-              ) : state.hasUnsavedChanges ? (
-                <div className="status-indicator unsaved">
-                  <div className="status-icon">●</div>
-                  <span>Unsaved changes</span>
-                </div>
-              ) : state.lastSaved ? (
+              ) : state.lastAutoSave ? (
                 <div className="status-indicator saved">
                   <div className="status-icon">✓</div>
-                  <span>Saved {formatTimeAgo(state.lastSaved)}</span>
+                  <span>Saved {formatTimeAgo(state.lastAutoSave)}</span>
                 </div>
               ) : null}
             </div>
           )}
 
           {/* Assessment type badge */}
-          {navigation.assessmentType && (
-            <div className={`assessment-badge ${navigation.assessmentType.toLowerCase()}`}>
-              {navigation.assessmentType === 'Company' ? '🏢' : '👤'} {navigation.assessmentType}
+          {assessmentType && (
+            <div className={`assessment-badge ${assessmentType.toLowerCase()}`}>
+              {assessmentType === 'Company' ? '🏢' : '👤'} {assessmentType}
             </div>
           )}
         </div>
