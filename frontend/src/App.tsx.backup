@@ -1,0 +1,9 @@
+/**
+ * BACKUP FILE - TypeScript version
+ * This file has been converted to JavaScript as App.js
+ * This backup is kept for reference only
+ */
+
+// This TypeScript file has been converted to JavaScript
+// Please use App.js instead
+console.warn('This is a backup TypeScript file. Please use App.js instead.');
