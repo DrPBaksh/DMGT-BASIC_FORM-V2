@@ -30,7 +30,7 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Log error to console for development
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
@@ -116,7 +116,7 @@ ${errorReport.componentStack}`;
     });
   };
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       // Custom fallback UI
       if (this.props.fallback) {
