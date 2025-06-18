@@ -5,7 +5,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "strict": false,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": false,
     "module": "esnext",
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -13,16 +13,23 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "noImplicitAny": false,
-    "checkJs": false
+    "checkJs": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": [
     "src/**/*.js",
-    "src/**/*.jsx"
+    "src/**/*.jsx",
+    "src/**/*.css"
   ],
   "exclude": [
     "node_modules",
     "build",
     "dist",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.ts",
+    "**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx"
   ]
