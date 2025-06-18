@@ -2,16 +2,17 @@
 // Professional completion page with results summary and next steps
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAssessment } from '../context/AssessmentContext';
-import { formatDateTime } from '../utils';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const CompletionPage: React.FC = () => {
   const navigate = useNavigate();
-  const { state, navigation, actions } = useAssessment();
+  const { assessmentType, companyId, employeeId } = useParams<{
+    assessmentType: string;
+    companyId: string;
+    employeeId?: string;
+  }>();
 
   const handleStartNewAssessment = () => {
-    actions.resetForm();
     navigate('/');
   };
 
@@ -21,24 +22,23 @@ const CompletionPage: React.FC = () => {
   };
 
   const getCompletionMessage = () => {
-    if (navigation.assessmentType === 'Company') {
-      return `Congratulations! ${navigation.companyInfo?.name} has successfully completed the comprehensive Data & AI Readiness Assessment.`;
+    if (assessmentType === 'Company') {
+      return `Congratulations! Company ${companyId} has successfully completed the comprehensive Data & AI Readiness Assessment.`;
     } else {
-      return `Congratulations ${navigation.employeeInfo?.name}! You have successfully completed your individual Data & AI Readiness Assessment.`;
+      return `Congratulations! Employee ${employeeId} has successfully completed your individual Data & AI Readiness Assessment.`;
     }
   };
 
-  const getAssessmentSummary = () => {
-    const totalQuestions = state.progress.totalQuestions;
-    const completedQuestions = state.progress.completedQuestions.length;
-    const completionRate = state.progress.percentComplete;
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString();
+  };
 
+  const getAssessmentSummary = () => {
     return {
-      totalQuestions,
-      completedQuestions,
-      completionRate,
-      assessmentType: navigation.assessmentType,
-      completedAt: new Date().toISOString()
+      assessmentType: assessmentType || 'Unknown',
+      completedAt: new Date().toISOString(),
+      companyId,
+      employeeId
     };
   };
 
@@ -78,31 +78,19 @@ const CompletionPage: React.FC = () => {
               </div>
               
               <div className="summary-item">
-                <div className="summary-label">Completion Rate</div>
-                <div className="summary-value">{summary.completionRate}%</div>
-              </div>
-              
-              <div className="summary-item">
-                <div className="summary-label">Questions Answered</div>
-                <div className="summary-value">{summary.completedQuestions} of {summary.totalQuestions}</div>
-              </div>
-              
-              <div className="summary-item">
                 <div className="summary-label">Completed On</div>
                 <div className="summary-value">{formatDateTime(summary.completedAt)}</div>
               </div>
 
-              {navigation.companyInfo && (
-                <div className="summary-item">
-                  <div className="summary-label">Company</div>
-                  <div className="summary-value">{navigation.companyInfo.name}</div>
-                </div>
-              )}
+              <div className="summary-item">
+                <div className="summary-label">Company ID</div>
+                <div className="summary-value">{summary.companyId}</div>
+              </div>
 
-              {navigation.employeeInfo && (
+              {summary.employeeId && (
                 <div className="summary-item">
-                  <div className="summary-label">Employee</div>
-                  <div className="summary-value">{navigation.employeeInfo.name}</div>
+                  <div className="summary-label">Employee ID</div>
+                  <div className="summary-value">{summary.employeeId}</div>
                 </div>
               )}
             </div>
