@@ -20,7 +20,7 @@ export interface Question {
   id: string;
   title: string;
   description?: string;
-  type: 'text' | 'textarea' | 'select' | 'multiselect' | 'file' | 'rating' | 'boolean' | 'number' | 'email';
+  type: 'text' | 'textarea' | 'select' | 'multiselect' | 'file' | 'rating' | 'boolean' | 'number' | 'email' | 'radio' | 'checkbox' | 'scale';
   options?: string[];
   required?: boolean;
   category?: string;
@@ -29,6 +29,12 @@ export interface Question {
   validation?: QuestionValidation;
   dependsOn?: string; // Question ID this depends on
   showIf?: any; // Value that triggers showing this question
+  
+  // Additional properties for enhanced form rendering
+  rows?: number; // For textarea fields
+  accept?: string; // For file uploads - accepted file types
+  multiple?: boolean; // For file uploads - allow multiple files
+  maxSize?: number; // For file uploads - max file size in bytes
 }
 
 export interface QuestionSet {
