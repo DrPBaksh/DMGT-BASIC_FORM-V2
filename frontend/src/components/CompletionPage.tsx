@@ -3,9 +3,11 @@
 
 import React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAssessment } from '../context/AssessmentContext';
 
 const CompletionPage: React.FC = () => {
   const navigate = useNavigate();
+  const { state, clearAssessment } = useAssessment(); // Correctly destructure only existing properties
   const { assessmentType, companyId, employeeId } = useParams<{
     assessmentType: string;
     companyId: string;
@@ -13,6 +15,7 @@ const CompletionPage: React.FC = () => {
   }>();
 
   const handleStartNewAssessment = () => {
+    clearAssessment(); // Clear the current assessment
     navigate('/');
   };
 
@@ -36,9 +39,11 @@ const CompletionPage: React.FC = () => {
   const getAssessmentSummary = () => {
     return {
       assessmentType: assessmentType || 'Unknown',
-      completedAt: new Date().toISOString(),
+      completedAt: state.currentAssessment?.metadata?.completedAt || new Date().toISOString(),
       companyId,
-      employeeId
+      employeeId,
+      progress: state.currentAssessment?.progress || 0,
+      responseCount: state.currentAssessment?.responses.length || 0
     };
   };
 
@@ -93,6 +98,16 @@ const CompletionPage: React.FC = () => {
                   <div className="summary-value">{summary.employeeId}</div>
                 </div>
               )}
+
+              <div className="summary-item">
+                <div className="summary-label">Progress</div>
+                <div className="summary-value">{summary.progress}% Complete</div>
+              </div>
+
+              <div className="summary-item">
+                <div className="summary-label">Responses</div>
+                <div className="summary-value">{summary.responseCount} Answers</div>
+              </div>
             </div>
           </div>
         </div>
